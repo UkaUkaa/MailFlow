@@ -1,0 +1,187 @@
+# MailFlow — complete local stack.  Start with:  docker compose up --build
+# Only Nginx publishes a port. PostgreSQL and Redis live on an internal-only network.
+# Production overrides: docker-compose.prod.yml (see docs/DOCKER.md).
+name: mailflow
+
+x-backend-env: &backend-env
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  LOG_LEVEL: ${LOG_LEVEL:-INFO}
+  API_DOCS_ENABLED: ${API_DOCS_ENABLED:-false}
+  APP_BASE_URL: ${APP_BASE_URL:?set APP_BASE_URL}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:?set ALLOWED_HOSTS}
+  DATABASE_URL: postgresql+asyncpg://mailflow_app:${MAILFLOW_APP_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-mailflow}
+  REDIS_URL: redis://:${REDIS_PASSWORD:?}@redis:6379/0
+  VAULT_KEYS: ${VAULT_KEYS:?set VAULT_KEYS}
+  VAULT_PRIMARY_KEY_ID: ${VAULT_PRIMARY_KEY_ID:-k1}
+  GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+  MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+  MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+  MICROSOFT_TENANT: ${MICROSOFT_TENANT:-common}
+  MICROSOFT_REDIRECT_URI: ${MICROSOFT_REDIRECT_URI:-}
+  SMTP_HOST: ${SMTP_HOST:-mailpit}
+  SMTP_PORT: ${SMTP_PORT:-1025}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_STARTTLS: ${SMTP_STARTTLS:-false}
+  MAIL_FROM: ${MAIL_FROM:-MailFlow <no-reply@mailflow.local>}
+  REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
+  SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-336}
+  SESSION_IDLE_TIMEOUT_HOURS: ${SESSION_IDLE_TIMEOUT_HOURS:-168}
+  SYNC_INTERVAL_SECONDS: ${SYNC_INTERVAL_SECONDS:-120}
+  SYNC_BACKFILL_MAX_MESSAGES: ${SYNC_BACKFILL_MAX_MESSAGES:-5000}
+  GMAIL_SYNC_UNITS_PER_MINUTE: ${GMAIL_SYNC_UNITS_PER_MINUTE:-3600}
+  OUTLOOK_SYNC_REQUESTS_PER_MINUTE: ${OUTLOOK_SYNC_REQUESTS_PER_MINUTE:-300}
+
+x-hardening: &hardening
+  restart: unless-stopped
+  read_only: true
+  tmpfs: [/tmp]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-mailflow}
+      POSTGRES_USER: ${POSTGRES_USER:-mailflow_owner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      MAILFLOW_APP_PASSWORD: ${MAILFLOW_APP_PASSWORD:?set MAILFLOW_APP_PASSWORD}
+      MAILFLOW_CREATE_TEST_DB: "false"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    networks: [data]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    <<: *hardening
+    user: redis   # start unprivileged; the image's root entrypoint would need SETUID/SETGID
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf", "--requirepass", "${REDIS_PASSWORD:?set REDIS_PASSWORD}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}
+    volumes:
+      - ./infra/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - redisdata:/data
+    networks: [data]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    image: mailflow-backend:local   # built once by the backend service
+    pull_policy: never
+    <<: *hardening
+    restart: "no"
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      <<: *backend-env
+      # Migrations are the only thing that runs as the table-owner role.
+      DATABASE_MIGRATION_URL: postgresql+asyncpg://${POSTGRES_USER:-mailflow_owner}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-mailflow}
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [data]
+
+  backend:
+    build: ./backend
+    image: mailflow-backend:local
+    <<: *hardening
+    environment: *backend-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    networks: [web, data]
+
+  celery_worker:
+    image: mailflow-backend:local   # built once by the backend service
+    pull_policy: never
+    <<: *hardening
+    command: ["celery", "-A", "app.infrastructure.celery.app", "worker", "--loglevel=INFO",
+              "-Q", "sync,default,maintenance", "--concurrency", "${CELERY_CONCURRENCY:-4}",
+              "--without-gossip", "--without-mingle"]
+    environment: *backend-env
+    stop_grace_period: 60s   # warm shutdown: let running syncs finish their current page
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    networks: [data, egress]
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.infrastructure.celery.app inspect ping -d celery@$$HOSTNAME --timeout 8 | grep -q pong"]
+      interval: 30s
+      timeout: 15s
+      start_period: 30s
+      retries: 3
+
+  celery_beat:
+    image: mailflow-backend:local   # built once by the backend service
+    pull_policy: never
+    <<: *hardening
+    command: ["celery", "-A", "app.infrastructure.celery.app", "beat", "--loglevel=INFO",
+              "--schedule", "/tmp/celerybeat-schedule", "--pidfile", "/tmp/celerybeat.pid"]
+    environment: *backend-env
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+    networks: [data]
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/celerybeat.pid"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    <<: *hardening
+    environment:
+      BACKEND_INTERNAL_URL: http://backend:8000
+      NODE_ENV: production
+    depends_on:
+      backend: { condition: service_healthy }
+    networks: [web]
+
+  nginx:
+    image: nginxinc/nginx-unprivileged:1.29-alpine
+    <<: *hardening
+    volumes:
+      - ./infra/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/common.conf:/etc/nginx/common.conf:ro
+    ports:
+      - "${HTTP_PORT:-8080}:8080"
+    depends_on:
+      backend: { condition: service_healthy }
+      frontend: { condition: service_healthy }
+    networks: [web]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/nginx-health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # Development mail catcher for verification / reset emails. Not part of production.
+  mailpit:
+    image: axllent/mailpit:latest
+    <<: *hardening
+    ports:
+      - "127.0.0.1:8025:8025"
+    networks: [data, web]
+
+networks:
+  web: {}
+  egress: {}
+  data:
+    internal: true   # no route to or from the outside world
+
+volumes:
+  pgdata: {}
+  redisdata: {}

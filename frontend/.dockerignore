@@ -1,0 +1,9 @@
+node_modules
+.next
+e2e
+playwright-report
+coverage
+*.log
+.env*
+Dockerfile
+.git

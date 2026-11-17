@@ -1,0 +1,12 @@
+[req]
+distinguished_name = dn
+x509_extensions = v3
+prompt = no
+[dn]
+CN = MailFlow TEST ONLY mail server
+O = MailFlow development fixture
+[v3]
+basicConstraints = critical, CA:TRUE
+keyUsage = critical, digitalSignature, keyEncipherment, keyCertSign
+extendedKeyUsage = serverAuth
+subjectAltName = DNS:localhost, DNS:mail.localhost, IP:127.0.0.1, IP:::1

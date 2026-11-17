@@ -1,0 +1,138 @@
+# Known limitations
+
+Honest list of what is missing or partial. Update whenever something here changes.
+
+## Providers
+
+- **Outlook / Microsoft Graph: implemented, NOT verified against a live Microsoft account.**
+  The adapter, OAuth client and connection UI are covered by tests against a mocked Graph and a
+  fake provider registry only. No request has ever been sent to the real service. Behaviour taken
+  from Microsoft's documentation but unconfirmed in practice includes: the exact error returned
+  for an expired delta token, whether `lastModifiedDateTime` moves on every read/flag change (used
+  while change tracking is being established), the largest page size delta accepts, that a move
+  to the folder a message is already in is harmless, where `DELETE` puts a draft, and how soon a
+  sent message is readable under its draft id. Expect to fix things on the first live connection.
+- Outlook specifics:
+  - Disconnecting cannot revoke the grant (Microsoft has no token revocation endpoint); MailFlow
+    deletes its tokens and the user removes the app from their Microsoft account.
+  - Establishing change tracking walks every folder once (ids only). Until a folder has been
+    walked, a read/flag change or deletion made elsewhere to an already imported message in that
+    folder can be missed if Exchange does not update its modification time.
+  - A removed message costs one extra request to tell a move from a deletion.
+  - A folder that is permanently deleted, or an expired delta token, triggers a full re-import
+    of the mailbox.
+  - Restoring from trash and "not spam" move messages to the Inbox, not to their original folder.
+    Archiving needs the mailbox's Archive folder to exist.
+  - A reply whose original message is no longer in the mailbox is sent as a new conversation.
+  - Hidden folders are not synchronized; shared and delegated mailboxes are not supported.
+  - Attachment content ids are not read, so inline images cannot be matched to `cid:` references;
+    message size is not available from Graph v1.0.
+  - Editing a draft keeps attachments added in Outlook itself.
+  - Publishing to other organizations is limited until the app registration is publisher
+    verified; see `EMAIL_INTEGRATION.md`.
+- **IMAP/SMTP: implemented, tested against a local test server only.** Everything was run
+  against GreenMail 2.1.3 (an in-memory Java test server) and against scripted in-process
+  servers. **No real-world IMAP or SMTP server has been used** — not Dovecot, Cyrus, Exchange,
+  Gmail, Yahoo, iCloud or Fastmail. GreenMail offers UIDPLUS and MOVE but neither CONDSTORE,
+  SPECIAL-USE nor STARTTLS, so these paths are covered only by unit tests with fakes: the
+  CONDSTORE flag sync, SPECIAL-USE role detection, STARTTLS upgrade, the COPY + EXPUNGE fallback,
+  `LOGIN` without `AUTH=PLAIN`. Assumptions that a real server may break:
+  - `STATUS` answers `MESSAGES`, `UIDNEXT`, `UIDVALIDITY` (and `HIGHESTMODSEQ` with CONDSTORE) for
+    every listed folder, also for the selected one;
+  - `LIST "" "*"` returns SPECIAL-USE attributes without being asked (`LIST (SPECIAL-USE)` /
+    `XLIST` are not used);
+  - `UID MOVE` / `UID COPY` answer with `COPYUID` and `APPEND` with `APPENDUID` (otherwise moved
+    messages are re-imported under a new id on the next sync, and the saved copy is found by a
+    `Message-ID` header search);
+  - a partial fetch `BODY.PEEK[]<0.N>` is accepted;
+  - a failed login is a wrong password (only RFC 5530 `[UNAVAILABLE]`-style codes are treated as
+    temporary) — a server that answers plain `NO` while overloaded would put the mailbox in
+    *Reconnect required*;
+  - folder names are modified UTF-7 without CR/LF (`UTF8=ACCEPT` is not enabled; other names are
+    skipped).
+- IMAP specifics:
+  - No conversations: one message per conversation. No server-side search.
+  - Archive / spam / drafts need a folder with that role; trash needs a Trash folder. Folder roles
+    on servers without SPECIAL-USE are recognised by common English names only.
+  - Without CONDSTORE, read/star changes made in another client are noticed only for the 100 most
+    recent messages of each folder.
+  - Every operation opens a new connection (TLS handshake + login); a user action takes as long
+    as that does on the server. Servers that limit logins per minute may throttle MailFlow.
+  - The first synchronization reads the UID list of every folder (up to 200 folders); a `SEARCH`
+    answer longer than 1 MB (roughly 140,000 messages in one folder) fails in `imaplib`.
+  - A sent message is appended to Sent by MailFlow; servers that also save it themselves (Gmail)
+    end up with two copies. A message sent from a mailbox without a Sent folder is not listed.
+  - A permanent SMTP rejection (relay denied, message too large, all recipients refused) is
+    reported as "provider temporarily unavailable".
+  - Passwords with non-ASCII characters work only where the IMAP server offers `AUTH=PLAIN`, and
+    not for SMTP.
+  - Restoring from trash and "not spam" move to the Inbox, not to the original folder.
+  - Editing a draft changes its conversation id (the message id stays).
+  - Messages over 40 MB are read truncated. Messages flagged `\Deleted` but not expunged are
+    shown as normal messages.
+  - Server address, port and user name cannot be edited after connecting.
+  - IMAP and SMTP calls block a thread of the process's default pool for their duration; many
+    slow mail servers at once can delay other IMAP users of the same process.
+  - The mailbox password is stored (encrypted) because IMAP offers nothing else; OAuth2 for IMAP
+    (XOAUTH2 / OAUTHBEARER) is not implemented.
+- **Gmail, live:** connecting three real mailboxes (OAuth), initial import, folders and
+  incremental sync and sending a new message were run against the live Gmail API. Message
+  actions, reply/forward, drafts and attachment download have **not** yet been confirmed live;
+  they are covered by mocked-API tests.
+- Importing a mailbox is slow by design of Gmail's quota (about 50–60 messages per minute); see
+  `EMAIL_INTEGRATION.md`.
+- Public Gmail access requires Google OAuth verification; `gmail.modify` is a *restricted* scope
+  and needs a security assessment (CASA) before unverified-app limits are lifted.
+
+## Mail features
+
+- Draft attachments are kept in the browser until send; they are not saved with the draft.
+- Inline (`cid:`) images are listed as attachments instead of being shown in place.
+- Search covers mail already synchronized into MailFlow (prefix full-text search); it does not
+  query the provider for older mail.
+- Initial sync imports the newest messages first and backfills up to
+  `SYNC_BACKFILL_MAX_MESSAGES` (default 5000) per mailbox.
+- Star and read actions on a conversation apply to all of its messages.
+- Custom folders (labels) can be browsed; creating, renaming and assigning them is not available.
+- Permanent deletion is intentionally not offered (scope `gmail.modify` cannot do it).
+- No push notifications; mail arrives on the periodic sync (default every 2 minutes) or manual sync.
+- An ambiguous network failure during send releases the idempotency key so the user can retry;
+  in that rare case a duplicate is possible.
+
+## Frontend
+
+- Mail screens (list, reader, composer) are tested with mocked API responses; they have not been
+  exercised against a live mailbox because no Google credentials were available.
+- Virtual-keyboard and safe-area behaviour is verified by viewport emulation only; real iOS and
+  Android devices still need a manual pass.
+- No bulk selection, swipe gestures or keyboard-shortcut layer yet.
+- A reopened draft loads its quoted text in simplified form.
+- The `conversation_view` setting is stored but has no UI.
+
+## Accounts
+
+- A deactivated MailFlow account cannot be reactivated through the UI.
+- No two-factor authentication, no social login.
+
+## Security
+
+- No external penetration test or security audit.
+- No malware scanning of attachments.
+- Message bodies are stored sanitized but not encrypted per tenant at the application level.
+- The application-wide CSP at Nginx allows inline scripts and styles (required by the current
+  Next.js setup); a nonce-based policy is future hardening.
+- The vault key lives in process memory; a KMS/HSM-backed envelope scheme is the upgrade path.
+- Rate limiting is fixed-window and per instance of Redis; no CAPTCHA or bot detection.
+- The IMAP connect endpoint returns uniform error codes, but response time still reveals whether
+  a public host accepts connections on a mail port (bounded by 10 attempts/hour per user).
+- TLS to user-supplied mail servers trusts the system certificate store; there is no pinning,
+  no DANE, no MTA-STS.
+- Provider calls run inside the request's database transaction (a slow provider holds a
+  connection for the duration of the call).
+
+## Operations
+
+- No metrics/monitoring stack (Prometheus, Sentry) is wired; logs are structured JSON only.
+- Database backups are documented, not automated.
+- No admin interface for user status or sync health.
+- Performance has not been benchmarked.
