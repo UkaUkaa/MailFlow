@@ -11,3 +11,25 @@ export const ACCOUNT_COLORS = [
 ] as const;
 
 export const DEFAULT_ACCOUNT_COLOR = ACCOUNT_COLORS[0];
+
+/**
+ * The same eight hues, 15% darker, for avatar discs: white initials reach at least 5:1 on each.
+ * An avatar never fetches a picture; its colour is derived from the address alone.
+ */
+export const AVATAR_COLORS = [
+  "#2b48be",
+  "#0c7a7a",
+  "#1a7541",
+  "#8f5a00",
+  "#a54531",
+  "#9c3075",
+  "#6843b6",
+  "#4f5665",
+] as const;
+
+/** Deterministic colour for a sender: the same address always gets the same hue. */
+export function avatarColor(seed: string): string {
+  let hash = 0;
+  for (const char of seed.trim().toLowerCase()) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length] ?? AVATAR_COLORS[0];
+}

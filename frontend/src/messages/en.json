@@ -21,7 +21,6 @@
     "primary": "Primary",
     "menu": "Navigation",
     "openMenu": "Open navigation",
-    "toggleSidebar": "Toggle sidebar",
     "compose": "Compose",
     "settings": "Settings",
     "search": "Search",
@@ -44,7 +43,11 @@
       "starred": "Starred",
       "search": "Search",
       "settings": "Settings"
-    }
+    },
+    "pinSidebar": "Keep sidebar open",
+    "unpinSidebar": "Collapse to icons",
+    "more": "Accounts and folders",
+    "accounts": "Accounts"
   },
   "accounts": {
     "title": "Connected accounts",
@@ -174,8 +177,6 @@
     "emptyDescription": "Conversations in this folder will appear here.",
     "emptyUnreadTitle": "All caught up",
     "emptyUnreadDescription": "There are no unread conversations in this folder.",
-    "searchPromptTitle": "Search your mail",
-    "searchPromptDescription": "Find conversations by sender, subject or content.",
     "noResultsTitle": "No results",
     "noResultsDescription": "Try different keywords or check the spelling.",
     "endOfList": "End of list",
@@ -201,6 +202,16 @@
         "not_spam": "{count, plural, one {Conversation moved out of spam} other {# conversations moved out of spam}}",
         "mark_unread": "{count, plural, one {Conversation marked as unread} other {# conversations marked as unread}}"
       }
+    },
+    "noContent": "No content",
+    "newMessage": "New message",
+    "backToInbox": "Back to inbox",
+    "messageCount": "{count, plural, one {# message} other {# messages}}",
+    "groups": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This week",
+      "lastWeek": "Last week"
     }
   },
   "reader": {
@@ -215,11 +226,11 @@
     "replyAll": "Reply all",
     "forward": "Forward",
     "draft": "Draft",
-    "editDraft": "Edit draft",
+    "editDraft": "Edit",
     "expandMessage": "Expand message from {sender}",
     "messageFrom": "Message from {sender}",
     "messageActions": "Message actions",
-    "toRecipients": "to {recipients}",
+    "toRecipients": "to <r>{recipients}</r>",
     "toggleDetails": "Show or hide details",
     "from": "From",
     "to": "To",
@@ -232,12 +243,24 @@
     "attachments": "{count, plural, one {# attachment} other {# attachments}}",
     "download": "Download",
     "fitToScreen": "Fit to screen",
-    "originalSize": "View at original size"
+    "originalSize": "View at original size",
+    "noRecipients": "No recipients yet",
+    "deleteDraft": "Delete",
+    "deleteDraftTitle": "Delete this draft?",
+    "deleteDraftDescription": "The draft is removed from the mailbox. This cannot be undone.",
+    "draftDeleted": "Draft deleted",
+    "showQuoted": "Show quoted text",
+    "hideQuoted": "Hide quoted text"
   },
   "search": {
     "label": "Search mail",
     "placeholder": "Search mail",
-    "clear": "Clear search"
+    "clear": "Clear search",
+    "close": "Close search",
+    "recent": "Recent searches",
+    "searchFor": "Search for {query}",
+    "hintTitle": "Search by words",
+    "hintDescription": "Finds synchronized conversations containing your words, or words that start with them. Search operators such as from: are not supported."
   },
   "composer": {
     "title": {
@@ -251,14 +274,12 @@
     "to": "To",
     "cc": "Cc",
     "bcc": "Bcc",
-    "ccBcc": "Cc/Bcc",
     "subject": "Subject",
     "body": "Message",
     "bodyPlaceholder": "Write your message",
     "send": "Send",
     "sendAnyway": "Send anyway",
     "close": "Save and close",
-    "minimize": "Minimize",
     "expand": "Expand",
     "attach": "Attach files",
     "attachments": "Attachments",
@@ -323,7 +344,9 @@
         "network_error": "You appear to be offline. Your message was not sent.",
         "unknown": "The message could not be sent. Please try again."
       }
-    }
+    },
+    "dock": "Dock",
+    "recipientsPlaceholder": "To, Cc, Bcc"
   },
   "auth": {
     "backToLogin": "Back to sign in",
@@ -487,6 +510,7 @@
         "confirmAction": "Delete permanently",
         "typeToConfirm": "Type {word} to confirm"
       }
-    }
+    },
+    "close": "Close settings"
   }
 }

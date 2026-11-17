@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEmailDocument, contentSecurityPolicy, emailFollowsTheme, stripRemoteImages } from "./email-document";
+import { buildEmailDocument, contentSecurityPolicy, emailFollowsTheme, hasQuotedHistory, markQuotedHistory, stripRemoteImages } from "./email-document";
 
 const options = { foreground: "#eee", linkColor: "#88f", mutedColor: "#aaa", borderColor: "#333" };
 
@@ -57,5 +57,55 @@ describe("email document", () => {
     const paper = buildEmailDocument('<p style="color:#111">Hello</p>', { ...options, allowRemoteImages: false, paperPadding: 16 });
     expect(paper).toContain("padding:16px");
     expect(paper).toContain("color:#17181c;background:#ffffff");
+  });
+});
+
+describe("markQuotedHistory", () => {
+  it("marks the quote that closes a reply and leaves the reply itself alone", () => {
+    const { html, hasQuote } = markQuotedHistory("<p>Thanks!</p><blockquote><p>Earlier text</p></blockquote>");
+    expect(hasQuote).toBe(true);
+    expect(html).toBe('<p>Thanks!</p><blockquote data-mf-quote=""><p>Earlier text</p></blockquote>');
+  });
+
+  it("marks only the outermost quote and ignores a tracking pixel or blank lines after it", () => {
+    const { html } = markQuotedHistory(
+      '<p>Reply</p><div><blockquote>Outer<blockquote>Inner</blockquote></blockquote></div><br><img src="https://tracker.example/p.gif" alt="">',
+    );
+    expect(html.match(/data-mf-quote/g)).toHaveLength(1);
+    expect(html).toContain('<blockquote data-mf-quote="">Outer<blockquote>Inner</blockquote></blockquote>');
+  });
+
+  it("does not hide a quote that is answered inline", () => {
+    const source = "<p>Hi</p><blockquote>Question?</blockquote><p>My answer.</p>";
+    expect(markQuotedHistory(source)).toEqual({ html: source, hasQuote: false });
+  });
+
+  it("marks several quotes when all of them close the message", () => {
+    const { html } = markQuotedHistory("<p>Hi</p><blockquote>One</blockquote><blockquote>Two</blockquote>");
+    expect(html.match(/data-mf-quote/g)).toHaveLength(2);
+  });
+
+  it("does not collapse a message that is nothing but a quote", () => {
+    const source = "<blockquote>Forwarded text</blockquote>";
+    expect(markQuotedHistory(source)).toEqual({ html: source, hasQuote: false });
+  });
+
+  it("does not let an email mark its own content as collapsed", () => {
+    const { html, hasQuote } = markQuotedHistory('<p data-mf-quote="">Important</p><blockquote>Old</blockquote>');
+    expect(hasQuote).toBe(true);
+    expect(html).toBe('<p>Important</p><blockquote data-mf-quote="">Old</blockquote>');
+    expect(hasQuotedHistory("<p>No quotes here</p>")).toBe(false);
+  });
+
+  it("hides marked quotes only while collapsed, without touching the policy", () => {
+    const options = { allowRemoteImages: false, foreground: "#111", linkColor: "#00f", mutedColor: "#666", borderColor: "#ccc" };
+    const html = "<p>Reply</p><blockquote>Old</blockquote>";
+    const collapsed = buildEmailDocument(html, { ...options, collapseQuotes: true });
+    const expanded = buildEmailDocument(html, { ...options, collapseQuotes: false });
+    expect(collapsed).toContain("[data-mf-quote]{display:none}");
+    expect(expanded).not.toContain("[data-mf-quote]{display:none}");
+    expect(collapsed).toContain(contentSecurityPolicy(false));
+    expect(collapsed).not.toContain("<script");
+    expect(expanded).toContain('<blockquote data-mf-quote="">Old</blockquote>');
   });
 });

@@ -13,55 +13,71 @@
 
 :root {
   color-scheme: light;
-  --background: #ffffff;
-  --surface: #f7f7f8;
+  /* Three tonal steps: rail (deepest) -> background (reading pane) -> surface (list pane, cards). */
+  --rail: #e9e9ee;
+  --background: #f5f5f7;
+  --surface: #ffffff;
   --surface-raised: #ffffff;
-  --muted: #f0f0f2;
-  --border: #e6e6ea;
-  --border-strong: #d2d2d9;
+  --muted: #ececf0;
+  --border: #e2e2e8;
+  --border-strong: #cfcfd8;
   --foreground: #17181c;
   --foreground-muted: #5d5f6b;
-  --foreground-subtle: #767885;
+  --foreground-subtle: #686a77;
   --accent: #3355e0;
   --accent-hover: #2947c7;
   --accent-foreground: #ffffff;
-  --accent-soft: #eef1fd;
-  --danger: #c93a3a;
+  --accent-soft: #e6ebfd;
+  --danger: #c43535;
   --danger-soft: #fdf0f0;
-  --success: #1f8a4c;
-  --warning: #a86a00;
+  --success: #197a42;
+  --warning: #8f5a00;
   --warning-soft: #fdf6e7;
   --overlay: rgb(15 16 20 / 0.45);
   --elev-sm: 0 1px 2px rgb(15 16 20 / 0.06), 0 4px 12px rgb(15 16 20 / 0.06);
   --elev-lg: 0 4px 10px rgb(15 16 20 / 0.06), 0 20px 48px rgb(15 16 20 / 0.16);
+  /* Width of the navigation column: nothing on phones, the icon rail from md, the pinned sidebar. */
+  --nav-width: 0px;
+  --nav-offset: calc(var(--nav-width) + env(safe-area-inset-left, 0px));
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --nav-width: 4.375rem;
+  }
+  :root:has(.mf-sidebar[data-pinned="true"]) {
+    --nav-width: 15rem;
+  }
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --background: #0c0d0f;
-  --surface: #121316;
-  --surface-raised: #191b1f;
-  --muted: #1e2025;
-  --border: #26282e;
-  --border-strong: #363941;
+  --rail: #0a0b0d;
+  --background: #17181c;
+  --surface: #202227;
+  --surface-raised: #24262c;
+  --muted: #2c2f36;
+  --border: #30333b;
+  --border-strong: #444852;
   --foreground: #ededf0;
-  --foreground-muted: #a0a3ad;
-  --foreground-subtle: #80838f;
-  --accent: #7d95ff;
-  --accent-hover: #93a7ff;
+  --foreground-muted: #adb0ba;
+  --foreground-subtle: #9497a3;
+  --accent: #8098ff;
+  --accent-hover: #96aaff;
   --accent-foreground: #0c0d0f;
-  --accent-soft: #1a2040;
-  --danger: #f07070;
-  --danger-soft: #2a1516;
+  --accent-soft: #27315e;
+  --danger: #f27878;
+  --danger-soft: #2e191b;
   --success: #4cc38a;
   --warning: #e0a83a;
-  --warning-soft: #2a2110;
+  --warning-soft: #2e2513;
   --overlay: rgb(0 0 0 / 0.6);
   --elev-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
   --elev-lg: 0 4px 10px rgb(0 0 0 / 0.4), 0 20px 48px rgb(0 0 0 / 0.5);
 }
 
 @theme inline {
+  --color-rail: var(--rail);
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
@@ -101,6 +117,7 @@
   --animate-sheet-up: sheet-up 200ms ease-out;
   --animate-drawer-in: drawer-in 200ms ease-out;
   --animate-pop-in: pop-in 140ms ease-out;
+  --animate-flyout-in: flyout-in 150ms ease-out;
 }
 
 @keyframes fade-in {
@@ -114,6 +131,10 @@
 @keyframes drawer-in {
   from { transform: translateX(-100%); }
   to { transform: translateX(0); }
+}
+@keyframes flyout-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 @keyframes pop-in {
   from { opacity: 0; transform: scale(0.97); }
@@ -188,38 +209,9 @@
   scrollbar-color: var(--border-strong) transparent;
 }
 
-/* Sidebar: rail by default, full from xl, user override through data-collapsed. */
+/* Navigation column: the icon rail, or the sidebar when the user pinned it open. */
 .mf-sidebar {
-  width: 3.5rem;
-}
-.mf-sidebar .sb-expanded {
-  display: none;
-}
-.mf-sidebar[data-collapsed="false"],
-.mf-sidebar[data-variant="drawer"] {
-  width: 15rem;
-}
-.mf-sidebar[data-variant="drawer"] {
-  width: 100%;
-}
-.mf-sidebar[data-collapsed="false"] .sb-expanded,
-.mf-sidebar[data-variant="drawer"] .sb-expanded {
-  display: block;
-}
-.mf-sidebar[data-collapsed="false"] .sb-collapsed,
-.mf-sidebar[data-variant="drawer"] .sb-collapsed {
-  display: none;
-}
-@media (min-width: 80rem) {
-  .mf-sidebar[data-collapsed="auto"] {
-    width: 15rem;
-  }
-  .mf-sidebar[data-collapsed="auto"] .sb-expanded {
-    display: block;
-  }
-  .mf-sidebar[data-collapsed="auto"] .sb-collapsed {
-    display: none;
-  }
+  width: var(--nav-offset);
 }
 
 /* Rich text editor */

@@ -1,5 +1,6 @@
 "use client";
 
+import { Trash2, UserRoundX } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState } from "react";
 import { errorKey, isApiError } from "@/infrastructure/api-client";
@@ -83,13 +84,13 @@ export function DangerZone() {
   const [dialog, setDialog] = useState<"deactivate" | "delete" | null>(null);
   return (
     <SettingsPage title={t("title")} description={t("description")}>
-      <SettingsCard className="border-danger/40">
-        <SettingsRow title={t("deactivate.title")} description={t("deactivate.description")}>
+      <SettingsCard flat className="border-danger/40 md:border-border">
+        <SettingsRow icon={UserRoundX} title={t("deactivate.title")} description={t("deactivate.description")}>
           <Button variant="secondary" className="max-sm:w-full" onClick={() => setDialog("deactivate")}>
             {t("deactivate.action")}
           </Button>
         </SettingsRow>
-        <SettingsRow title={t("delete.title")} description={t("delete.description")}>
+        <SettingsRow icon={Trash2} title={t("delete.title")} description={t("delete.description")}>
           <Button variant="danger" className="max-sm:w-full" onClick={() => setDialog("delete")}>
             {t("delete.action")}
           </Button>

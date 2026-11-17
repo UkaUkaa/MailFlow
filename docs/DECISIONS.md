@@ -147,3 +147,49 @@ The provider session (`ProviderSessionFactory.open`) is per use case, so the ada
 lazily and is closed when the session ends. Pooling connections across requests and workers
 would need per-account connection ownership and idle handling; deferred until latency against
 real servers shows it is needed.
+
+## D31 — Adopt the reference client's layout, not its identity
+The frontend follows `docs/design/SPARK_REFERENCE.md` for layout, structure, density, states and
+behaviour: icon rail with an on-demand flyout, date-grouped three-line list with avatars and
+gutter quick actions, messages as cards, document-like composer and docked reply, search as a
+mode of the list, settings as a dialog. Name, logo, glyphs, illustrations and colour values are
+not taken: the palette stays MailFlow's (ink-blue accent, own neutrals), icons are Lucide, the
+empty pane uses an open-envelope glyph. Deliberately **not** carried over, because MailFlow has
+no such feature and a control must do something real: pin, snooze, assign, share, AI, calendar,
+priority toggle, smart category cards, agents entry, templates, reminders, send later,
+send-and-archive, pop-out window, view switcher and sort mode in the list header.
+
+## D32 — Three tonal surfaces, also in the light theme
+Panes are separated by tone (`--rail` → `--background` → `--surface`), without divider lines.
+The dark theme was observable; the light theme was derived from the same roles (most tinted
+rail, faint grey reading pane, white list and cards). The neutrals were re-tuned for this and
+re-measured for WCAG AA (table in `DESIGN_SYSTEM.md`); `--warning`, `--success` and `--danger`
+were darkened in light because they no longer reached 4.5:1 on the grey canvas.
+
+## D33 — Settings dialog: a layout over the workspace, not intercepting routes
+From 768px the settings routes render as a modal dialog. Next's intercepting routes show a modal
+only after a soft navigation; a reload, a deep link or the OAuth return would have rendered the
+plain page instead, giving two presentations of one URL. The settings layout therefore always
+renders the mail workspace (inert) behind the dialog, and the URL stays the single source of
+truth. The dialog's geometry is CSS (no hydration flash); role, Escape, focus containment and
+`inert` are switched on in script. Radix `Dialog` is not used for this frame because switching
+between its modal and non-modal content remounts the children, which would run the OAuth-result
+effect twice.
+
+## D34 — Where the reference was not followed
+- **Flyout closes on Escape, outside click or selection, not when the pointer leaves** — pointer
+  leave has no keyboard or touch equivalent.
+- **Formatting bar is always visible** in the composer — a selection-only toolbar is unreachable
+  on touch.
+- **Send is a labelled primary button**, close is an X button, the settings dialog closes with an
+  X (not a red dot imitating window chrome).
+- **Star stays in the list row**; the list header keeps the unread filter and sync.
+- **Reading column is capped** at `52rem` and centred (the reference has no cap at its window
+  size); the toolbar and subject share the column so they stay aligned on wide screens.
+- **Search suggestions are recent queries and a description**, not operators: the API is a plain
+  full-text prefix search. Recent queries stay in memory, never in `localStorage`.
+- **The "done" segment is labelled Archive** and exists only where the mailbox can archive.
+- **Recipients open on first focus and stay open** — collapsing them again on blur would move
+  the page under the pointer between mouse-down and mouse-up.
+- **Month headings** use the locale's standalone month name; week boundaries follow the locale
+  (Sunday in en-US, Monday in uk).

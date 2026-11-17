@@ -26,20 +26,29 @@ const VIEW_CAPABILITY: Partial<Record<SystemView, CapabilityName>> = {
   spam: "spam",
 };
 
-const itemClasses =
-  "flex h-9 min-w-0 items-center gap-2.5 rounded-md px-2.5 text-sm text-foreground-muted transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-accent-soft aria-[current=page]:font-medium aria-[current=page]:text-accent touch:h-11";
+/** Icon + label row of the sidebar: 31px dense, finger-sized on touch; the open view is a solid accent pill. */
+const rowClasses =
+  "flex h-[31px] min-w-0 items-center gap-2.5 rounded-sm px-2 text-sm text-foreground-muted transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:font-medium aria-[current=page]:text-accent-foreground touch:h-11";
+
+/** Icon-only button of the rail: the open view is a solid accent rounded square. */
+const railClasses =
+  "relative flex size-7 items-center justify-center rounded-[7px] text-foreground-muted transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground touch:size-11";
 
 function formatCount(count: number): string {
   return count > 999 ? "999+" : String(count);
 }
 
-export function FolderNav({ onNavigate }: { onNavigate?: () => void }) {
+/**
+ * Mail views. `rail` renders icon buttons with tooltips for the narrow rail;
+ * `full` renders labelled rows with unread counts and the mailbox's own folders.
+ */
+export function FolderNav({ onNavigate, variant = "full" }: { onNavigate?: () => void; variant?: "full" | "rail" }) {
   const t = useTranslations("nav");
   const params = useParams<{ view?: string }>();
   const searchParams = useSearchParams();
   const accountId = searchParams.get("account");
   const counts = useFolderCounts(accountId);
-  const folders = useFolders(accountId, Boolean(accountId));
+  const folders = useFolders(accountId, Boolean(accountId) && variant === "full");
   const query = accountId ? { account: accountId } : undefined;
   const customFolders = (folders.data ?? []).filter((folder) => folder.role === "custom");
 
@@ -53,56 +62,80 @@ export function FolderNav({ onNavigate }: { onNavigate?: () => void }) {
   });
 
   const unread = (role: SystemView): number =>
-    counts.data?.find((item) => item.role === role)?.unread_count ?? 0;
+    role === "sent" || role === "trash" || role === "archive" ? 0 : (counts.data?.find((item) => item.role === role)?.unread_count ?? 0);
+
+  if (variant === "rail") {
+    return (
+      <nav aria-label={t("folders")}>
+        <ul className="flex flex-col items-center gap-[3px] touch:gap-0.5">
+          {views.map((role) => {
+            const Icon = VIEW_ICONS[role];
+            const count = unread(role);
+            const label = t(`views.${role}`);
+            return (
+              <li key={role}>
+                <Tooltip label={label} side="right">
+                  <Link
+                    href={{ pathname: `/mail/${role}`, query }}
+                    aria-current={params.view === role ? "page" : undefined}
+                    aria-label={count > 0 ? t("viewWithUnread", { view: label, count }) : label}
+                    className={railClasses}
+                  >
+                    <Icon className="size-5" aria-hidden />
+                    {count > 0 ? (
+                      <span aria-hidden className="absolute top-0.5 right-0.5 size-2 rounded-full border-2 border-rail bg-accent touch:top-2 touch:right-2" />
+                    ) : null}
+                  </Link>
+                </Tooltip>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    );
+  }
 
   return (
     <nav aria-label={t("folders")}>
-      <ul className="flex flex-col gap-0.5">
+      <ul className="flex flex-col">
         {views.map((role) => {
           const Icon = VIEW_ICONS[role];
-          const count = role === "sent" || role === "trash" || role === "archive" ? 0 : unread(role);
+          const count = unread(role);
           const label = t(`views.${role}`);
           return (
             <li key={role}>
-              <Tooltip label={label} side="right">
-                <Link
-                  href={{ pathname: `/mail/${role}`, query }}
-                  aria-current={params.view === role ? "page" : undefined}
-                  aria-label={count > 0 ? t("viewWithUnread", { view: label, count }) : label}
-                  onClick={onNavigate}
-                  className={itemClasses}
-                >
-                  <span className="relative inline-flex shrink-0">
-                    <Icon className="size-4" aria-hidden />
-                    {count > 0 ? (
-                      <span aria-hidden className="sb-collapsed absolute -top-1 -right-1 size-1.5 rounded-full bg-accent" />
-                    ) : null}
+              <Link
+                href={{ pathname: `/mail/${role}`, query }}
+                aria-current={params.view === role ? "page" : undefined}
+                aria-label={count > 0 ? t("viewWithUnread", { view: label, count }) : label}
+                onClick={onNavigate}
+                className={rowClasses}
+              >
+                <Icon className="size-4 shrink-0 touch:size-5" aria-hidden />
+                <span className="min-w-0 flex-1 truncate">{label}</span>
+                {count > 0 ? (
+                  <span aria-hidden className="shrink-0 text-xs font-medium tabular-nums">
+                    {formatCount(count)}
                   </span>
-                  <span className="sb-expanded min-w-0 flex-1 truncate">{label}</span>
-                  {count > 0 ? (
-                    <span aria-hidden className="sb-expanded shrink-0 text-xs font-medium tabular-nums">
-                      {formatCount(count)}
-                    </span>
-                  ) : null}
-                </Link>
-              </Tooltip>
+                ) : null}
+              </Link>
             </li>
           );
         })}
       </ul>
       {customFolders.length > 0 ? (
-        <div className="sb-expanded mt-4">
-          <h3 className="px-2.5 pb-1 text-xs font-medium text-foreground-subtle">{t("labels")}</h3>
-          <ul className="flex flex-col gap-0.5">
+        <div className="mt-3">
+          <h3 className="px-2 pb-1 text-xs font-medium text-foreground-subtle">{t("labels")}</h3>
+          <ul className="flex flex-col">
             {customFolders.map((folder) => (
               <li key={folder.id}>
                 <Link
                   href={{ pathname: `/mail/${folderViewSlug(folder.id)}`, query }}
                   aria-current={params.view === folderViewSlug(folder.id) ? "page" : undefined}
                   onClick={onNavigate}
-                  className={itemClasses}
+                  className={rowClasses}
                 >
-                  <FolderIcon className="size-4 shrink-0" aria-hidden />
+                  <FolderIcon className="size-4 shrink-0 touch:size-5" aria-hidden />
                   <span className="min-w-0 flex-1 truncate">{folder.name}</span>
                   {folder.unread_count > 0 ? (
                     <span className="shrink-0 text-xs font-medium tabular-nums">{formatCount(folder.unread_count)}</span>

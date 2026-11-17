@@ -109,6 +109,24 @@ Honest list of what is missing or partial. Update whenever something here change
 - A reopened draft loads its quoted text in simplified form.
 - The `conversation_view` setting is stored but has no UI.
 
+- A draft inside a conversation can be edited or deleted from its card but not sent from it:
+  sending needs the full composer state (recipient validation, attachments, idempotency key).
+  Opening a reply does not add a draft card to the conversation until the draft is stored and
+  the conversation reloads.
+- Quoted history is collapsed only for `blockquote` blocks that end a message; providers that
+  mark quotes with a class or a plain "On … wrote:" line are not detected (the sanitizer strips
+  classes).
+- Search suggestions offer no operators (`from:`, `has:` …): the search API has none.
+- Avatars are initials on a colour; no pictures (Gravatar, provider photos) are loaded.
+- The flyout is modal: while it is open the rail behind it does not react until it is closed.
+- Behind the settings dialog the list of the last mail view is shown without the open
+  conversation.
+- The date headings do not update at midnight until the list re-renders.
+- The light theme has no reference observation; it was derived from the dark roles.
+- Not visually verified on real devices or in Safari / Firefox: the new layout was reviewed in
+  Chromium screenshots only. The draft card and the pinned sidebar are covered by tests but have
+  no fixture-driven screenshot in the viewport matrix (pinned: one desktop screenshot).
+
 ## Accounts
 
 - A deactivated MailFlow account cannot be reactivated through the UI.

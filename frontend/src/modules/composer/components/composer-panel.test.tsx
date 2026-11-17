@@ -116,3 +116,77 @@ describe("ComposerPanel drafts follow the mailbox capability", () => {
     expect(screen.queryByRole("dialog", { name: "Discard this message?" })).not.toBeInTheDocument();
   });
 });
+
+describe("ComposerPanel presentation", () => {
+  const reply: ComposeSession = { ...session, mode: "reply", subject: "Re: Hello", to: [{ name: "Marta", email: "marta@example.com" }], sourceMessageId: "m1" };
+  const desktop = (matches: boolean) =>
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+
+  function renderSession(value: ComposeSession) {
+    renderWithProviders(
+      <TooltipProvider>
+        <ComposerPanel session={value} onClose={vi.fn()} />
+      </TooltipProvider>,
+    );
+  }
+
+  it("docks a reply on desktop, expands it to the page and docks it again without losing the text", async () => {
+    accounts = [makeAccount("acc-1")];
+    desktop(true);
+    renderSession(reply);
+    const panel = await screen.findByRole("dialog", { name: "Reply" });
+    expect(panel).toHaveAttribute("data-layout", "docked");
+    const composer = within(panel);
+    fireEvent.change(composer.getByLabelText("Subject"), { target: { value: "Re: Hello again" } });
+    expect(composer.getByRole("button", { name: "Send" })).toBeInTheDocument();
+    expect(composer.getByRole("toolbar", { name: "Formatting" })).toBeInTheDocument();
+
+    fireEvent.click(composer.getByRole("button", { name: "Expand" }));
+    expect(panel).toHaveAttribute("data-layout", "page");
+    expect(composer.getByLabelText("Subject")).toHaveValue("Re: Hello again");
+    expect(composer.getByText("Marta")).toBeInTheDocument();
+
+    fireEvent.click(composer.getByRole("button", { name: "Dock" }));
+    expect(panel).toHaveAttribute("data-layout", "docked");
+    expect(composer.getByLabelText("Subject")).toHaveValue("Re: Hello again");
+  });
+
+  it("uses the full composer for a reply below the desktop width", async () => {
+    accounts = [makeAccount("acc-1")];
+    desktop(false);
+    renderSession(reply);
+    const panel = await screen.findByRole("dialog", { name: "Reply" });
+    expect(panel).toHaveAttribute("data-layout", "page");
+    expect(within(panel).queryByRole("button", { name: "Expand" })).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("button", { name: "Dock" })).not.toBeInTheDocument();
+  });
+
+  it("never docks a new message, and shows one recipients line until it gets focus", async () => {
+    accounts = [makeAccount("acc-1")];
+    desktop(true);
+    renderSession(session);
+    const panel = await screen.findByRole("dialog", { name: "New message" });
+    expect(panel).toHaveAttribute("data-layout", "page");
+    const composer = within(panel);
+    expect(composer.getByPlaceholderText("To, Cc, Bcc")).toBeInTheDocument();
+    expect(composer.queryByLabelText("Bcc")).not.toBeInTheDocument();
+    fireEvent.focus(composer.getByLabelText("To"));
+    expect(composer.getByLabelText("Cc")).toBeInTheDocument();
+    expect(composer.getByLabelText("Bcc")).toBeInTheDocument();
+  });
+
+  it("closes on Escape even from inside the message body", async () => {
+    accounts = [makeAccount("acc-1")];
+    desktop(false);
+    const onClose = vi.fn();
+    renderWithProviders(
+      <TooltipProvider>
+        <ComposerPanel session={session} onClose={onClose} />
+      </TooltipProvider>,
+    );
+    const panel = await screen.findByRole("dialog", { name: "New message" });
+    const body = await within(panel).findByRole("textbox", { name: "Message" });
+    fireEvent.keyDown(body, { key: "Escape" });
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+});

@@ -1,5 +1,6 @@
 "use client";
 
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { z } from "zod";
 import { api } from "@/infrastructure/api-client";
 import { draftSchema, type DraftRequest, type SendRequest } from "../types";
@@ -31,4 +32,16 @@ export function sendEmail(payload: SendRequest, files: File[], idempotencyKey: s
   form.set("payload", JSON.stringify(payload));
   for (const file of files) form.append("files", file, file.name);
   return api.post("/emails/send", sentSchema, form, { headers: { "Idempotency-Key": idempotencyKey } });
+}
+
+/** Deletes a stored draft and refreshes the lists and conversations that showed it. */
+export function useDeleteDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (draftId: string) => deleteDraft(draftId),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["threads"] });
+      void queryClient.invalidateQueries({ queryKey: ["folders"] });
+    },
+  });
 }

@@ -46,6 +46,7 @@ const TEXT = {
     newMessage: "New message",
     send: "Send",
     reply: "Reply",
+    replyTitle: "Reply",
     primary: "Primary",
     openMenu: "Open navigation",
     menu: "Navigation",
@@ -57,6 +58,13 @@ const TEXT = {
     settings: "Settings",
     subject: "Subject",
     to: "To",
+    more: "Accounts and folders",
+    search: "Search mail",
+    searchHint: "Search by words",
+    searchResults: "Search",
+    today: "Today",
+    showQuoted: "Show quoted text",
+    settingsTitle: "Settings",
   },
   uk: {
     signIn: "Увійти",
@@ -65,6 +73,7 @@ const TEXT = {
     newMessage: "Новий лист",
     send: "Надіслати",
     reply: "Відповісти",
+    replyTitle: "Відповідь",
     primary: "Основна навігація",
     openMenu: "Відкрити навігацію",
     menu: "Навігація",
@@ -76,6 +85,13 @@ const TEXT = {
     settings: "Налаштування",
     subject: "Тема",
     to: "Кому",
+    more: "Облікові записи й папки",
+    search: "Пошук у пошті",
+    searchHint: "Пошук за словами",
+    searchResults: "Пошук",
+    today: "Сьогодні",
+    showQuoted: "Показати цитований текст",
+    settingsTitle: "Налаштування",
   },
 } satisfies Record<Locale, Record<string, string>>;
 
@@ -90,8 +106,11 @@ async function walkthrough(page: Page, size: Size, locale: Locale, theme: "light
   const t = TEXT[locale];
   const phone = size.width < 768;
   const split = size.width >= 900;
+  const desktop = size.width >= 1024;
   const label = `${size.width}x${size.height} ${locale}`;
   await page.emulateMedia({ colorScheme: theme });
+  // The fixtures' newest mail is dated 17 November 2026; pin "now" so the date groups are stable.
+  await page.clock.setFixedTime(new Date("2026-11-17T12:00:00Z"));
 
   // 1. Login
   await mockApi(page, { authenticated: false });
@@ -119,10 +138,16 @@ async function walkthrough(page: Page, size: Size, locale: Locale, theme: "light
     const row = rows.nth(index);
     const box = await row.boundingBox();
     expect(box && box.x >= 0 && box.x + box.width <= size.width + 0.5, `${label} row ${index} inside viewport`).toBe(true);
-    // Long senders and subjects are truncated, never wrapped into tall rows.
+    // Long senders and subjects are truncated, never wrapped into tall rows: three lines, 88px.
     expect(box?.height ?? 0, `${label} row ${index} height`).toBeLessThanOrEqual(96);
+    expect(box?.height ?? 0, `${label} row ${index} is a three-line row`).toBeGreaterThanOrEqual(88);
+    // Avatar disc: 28px, never squeezed by a long sender.
+    const avatar = await row.locator("a > span").first().locator("span[aria-hidden]").last().boundingBox();
+    expect(Math.round(avatar?.width ?? 0), `${label} row ${index} avatar`).toBe(28);
     await expectNoOverlap(row.locator("time"), row.getByRole("button").first(), `${label} row ${index} time vs star`);
   }
+  // Conversations are grouped by date; the fixtures' newest mail is from "today".
+  await expect(list.getByRole("heading", { name: t.today }), `${label} date group`).toBeVisible();
   if (phone) {
     const nav = page.getByRole("navigation", { name: t.primary });
     await expectInViewport(page, nav, `${label} bottom nav`);
@@ -152,11 +177,20 @@ async function walkthrough(page: Page, size: Size, locale: Locale, theme: "light
     await expect(drawer).toBeHidden();
   } else {
     const sidebar = page.locator("aside.mf-sidebar");
-    const width = (await sidebar.boundingBox())?.width ?? 0;
-    // Rail below 1280px, full sidebar from 1280px.
-    if (size.width >= 1280) expect(width, `${label} full sidebar`).toBe(240);
-    else expect(width, `${label} rail`).toBe(56);
+    // The icon rail is the navigation at every width from 768px; the full list is a flyout.
+    expect((await sidebar.boundingBox())?.width ?? 0, `${label} rail`).toBe(70);
+    const more = sidebar.getByRole("button", { name: t.more });
+    await more.click();
+    const flyout = page.getByRole("dialog", { name: t.menu });
+    await expectInViewport(page, flyout, `${label} flyout`);
+    // Polled: the panel slides in over 150ms.
+    await expect.poll(async () => (await flyout.boundingBox())?.x, { message: `${label} flyout starts after the rail` }).toBe(70);
+    expect((await flyout.boundingBox())?.width, `${label} flyout width`).toBe(240);
+    await expectNoHorizontalOverflow(page, `${label} flyout`);
     await shot(page, size, locale, theme, "3-navigation");
+    await page.keyboard.press("Escape");
+    await expect(flyout).toBeHidden();
+    await expect(more, `${label} focus returns to the rail`).toBeFocused();
   }
 
   // 4. Reader: long subject, long addresses, a 900px-wide table and a long URL
@@ -179,12 +213,16 @@ async function walkthrough(page: Page, size: Size, locale: Locale, theme: "light
     clientWidth: element.contentDocument?.documentElement.clientWidth ?? 0,
   }));
   expect(inner.scrollWidth, `${label} email content fits its frame`).toBeLessThanOrEqual(inner.clientWidth + 1);
-  if (split) {
-    await expect(list).toBeVisible();
-  } else {
-    await expect(list).toBeHidden();
-    await expectInViewport(page, page.getByRole("link", { name: t.back }), `${label} back`);
-  }
+  if (split) await expect(list).toBeVisible();
+  else await expect(list).toBeHidden();
+  await expectInViewport(page, page.getByRole("link", { name: t.back }), `${label} back`);
+  // Messages are cards: 12px radius, inside the pane with a 12px inset.
+  const card = page.locator("article").filter({ has: frame });
+  const cardBox = await card.boundingBox();
+  expect(await card.evaluate((element) => getComputedStyle(element).borderTopLeftRadius), `${label} card radius`).toBe("12px");
+  expect((cardBox?.x ?? 0) >= 12 && (cardBox?.x ?? 0) + (cardBox?.width ?? 0) <= size.width - 12 + 0.5, `${label} card inset`).toBe(true);
+  // Quoted history starts collapsed behind a toggle.
+  await expect(card.getByRole("button", { name: t.showQuoted }), `${label} quote toggle`).toBeVisible();
   const reply = page.getByRole("button", { name: t.reply, exact: true }).locator("visible=true").first();
   if (phone) {
     await expectInViewport(page, reply, `${label} sticky reply`);
@@ -192,6 +230,27 @@ async function walkthrough(page: Page, size: Size, locale: Locale, theme: "light
     await expectTouchTarget(page.locator("section").first().locator(":scope > div").first().locator("a, button"), `${label} reader toolbar`);
   }
   await shot(page, size, locale, theme, "4-reader");
+
+  // 4b. Reply: docked panel on desktop, the full composer below.
+  await reply.click();
+  const replyPanel = page.getByRole("dialog", { name: t.replyTitle, exact: true });
+  await expectInViewport(page, replyPanel, `${label} reply composer`);
+  await settle(page); // the docked panel scales in
+  const replyBox = await replyPanel.boundingBox();
+  if (desktop) {
+    expect(replyBox?.width, `${label} docked reply width`).toBe(520);
+    expect(replyBox?.height ?? 0, `${label} docked reply height`).toBeLessThanOrEqual(380);
+    expect(Math.round((replyBox?.x ?? 0) + (replyBox?.width ?? 0)), `${label} docked reply sits at the right edge`).toBe(size.width - 12);
+    expect(Math.round((replyBox?.y ?? 0) + (replyBox?.height ?? 0)), `${label} docked reply sits at the bottom`).toBe(size.height - 12);
+  } else {
+    expect(replyBox, `${label} reply takes the workspace`).toMatchObject({ x: phone ? 0 : 70, y: 0, width: phone ? size.width : size.width - 70, height: size.height });
+  }
+  await expectInViewport(page, replyPanel.getByRole("button", { name: t.send }).locator("visible=true").first(), `${label} reply send`);
+  await expectInViewport(page, replyPanel.getByRole("toolbar", { name: t.formatting }), `${label} reply formatting`);
+  await expectNoHorizontalOverflow(page, `${label} reply composer`);
+  await shot(page, size, locale, theme, "4b-reply");
+  await page.keyboard.press("Escape");
+  await expect(replyPanel).toHaveCount(0);
 
   // 5. Composer
   await page.goto(`/${locale}/mail/inbox`);
@@ -212,16 +271,49 @@ async function walkthrough(page: Page, size: Size, locale: Locale, theme: "light
     await expectTouchTarget(send, `${label} send`);
     await expectTouchTarget(composer.locator("footer").locator("button, label[role=button]"), `${label} composer toolbar`);
   } else {
-    expect(composerBox?.width ?? 0, `${label} composer is a floating panel`).toBeLessThanOrEqual(576);
+    // Takes over the list and reading panes; the rail stays.
+    expect(composerBox, `${label} composer takes the workspace`).toMatchObject({ x: 70, y: 0, width: size.width - 70, height: size.height });
+    await expectInViewport(page, page.locator("aside.mf-sidebar"), `${label} rail beside the composer`);
+    // The subject is the document title: 22px, no field chrome.
+    const subjectStyle = await composer.getByLabel(t.subject).evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { size: style.fontSize, border: style.borderTopWidth };
+    });
+    expect(subjectStyle, `${label} subject as title`).toEqual({ size: "22px", border: "0px" });
   }
   await shot(page, size, locale, theme, "5-composer");
   await composer.getByLabel(t.subject).fill("");
   await composer.getByLabel(t.to).press("Backspace");
   await composer.getByLabel(t.to).press("Backspace");
 
-  // 6. Settings → connected accounts (long address, status badges, dialogs)
+  // 6. Search as a mode of the list pane
+  await page.goto(`/${locale}/mail/search`);
+  const searchbox = page.getByRole("searchbox", { name: t.search });
+  await expect(searchbox).toBeFocused();
+  await expect(page.getByRole("heading", { name: t.searchHint })).toBeVisible();
+  await expectNoHorizontalOverflow(page, `${label} search suggestions`);
+  if (phone) await expectTouchTarget(searchbox, `${label} search field`);
+  await shot(page, size, locale, theme, "8-search");
+  await searchbox.fill("invoice");
+  await searchbox.press("Enter");
+  await expect(page.getByRole("list", { name: t.searchResults }).getByRole("listitem").first()).toBeVisible();
+  await expectNoHorizontalOverflow(page, `${label} search results`);
+  await shot(page, size, locale, theme, "9-search-results");
+
+  // 7. Settings → connected accounts (long address, status badges, dialogs)
   await page.goto(`/${locale}/settings/accounts`);
   await expect(page.getByRole("heading", { name: t.mailboxes })).toBeVisible();
+  const settingsDialog = page.getByRole("dialog", { name: t.settingsTitle });
+  if (phone) {
+    // Full pages on phones.
+    await expect(settingsDialog).toHaveCount(0);
+  } else {
+    await expectInViewport(page, settingsDialog, `${label} settings dialog`);
+    const dialogBox = await settingsDialog.boundingBox();
+    expect(dialogBox?.width ?? 0, `${label} settings dialog width`).toBeLessThanOrEqual(870);
+    expect(dialogBox?.height ?? 0, `${label} settings dialog height`).toBeLessThanOrEqual(700);
+    expect(await settingsDialog.evaluate((element) => getComputedStyle(element).borderTopLeftRadius), `${label} settings radius`).toBe("12px");
+  }
   await expectInViewport(page, page.getByRole("button", { name: t.connectGmail }), `${label} connect button`).catch(async () => {
     // On short screens the button may be below the fold; it must then be reachable by scrolling.
     await page.getByRole("button", { name: t.connectGmail }).scrollIntoViewIfNeeded();

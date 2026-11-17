@@ -8,13 +8,13 @@ frontend/src/
   modules/
     authentication/    forms, session hook, auth API
     accounts/          connected accounts list, connect flow, account switcher
-    inbox/             thread list, list row, list toolbar, unified/individual filtering
+    inbox/             mail workspace and backdrop, thread list (date groups), list row
     emails/            reader, thread view, message card, EmailFrame, message actions
     composer/          composer state, editor, recipients input, draft autosave, send
     attachments/       attachment chips, download
     folders/           folder navigation, counts
-    search/            search box, results
-    settings/          profile, appearance, language, sessions, danger zone
+    search/            search box, suggestions, in-memory recent queries
+    settings/          settings dialog / pages, profile, appearance, language, sessions, danger zone
   shared/
     components/ui/         buttons, inputs, dialog, sheet, dropdown, toast ...
     components/layout/     AppShell, Pane, ResponsiveDialog, ResponsiveMenu
@@ -35,8 +35,9 @@ a small `index.ts`. Route files only compose feature components.
 
 - Server state: TanStack Query. Query keys are defined per module in `api/keys.ts`.
 - Mutations are optimistic for message actions (read, star, archive, trash) with rollback.
-- Client state: React context for composer and shell (drawer open, sidebar collapsed). Persisted
-  UI preferences (sidebar width/collapse) use `localStorage`; nothing sensitive is stored there.
+- Client state: React context for composer and shell (drawer, flyout, pinned sidebar). The one
+  persisted UI preference of the shell (sidebar pinned or rail) uses `localStorage`; nothing
+  sensitive is stored there. The last mail location and recent searches live in module memory.
 - Authentication: HttpOnly session cookie. The client reads only the non-secret CSRF cookie and
   echoes it in `X-CSRF-Token`. A 401 from any call clears the query cache and redirects to login.
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useId, useRef, useState, type ClipboardEvent, type KeyboardEvent, type ReactNode } from "react";
+import { useId, useRef, useState, type ClipboardEvent, type KeyboardEvent } from "react";
 import { cn } from "@/shared/lib/cn";
 import type { Address } from "@/shared/types/address";
 import { dedupeRecipients, isValidEmail, parseRecipients } from "../lib/recipients";
@@ -12,7 +12,8 @@ export function RecipientsInput({
   onChange,
   removeLabel,
   invalidLabel,
-  trailing,
+  placeholder,
+  hideLabel = false,
   autoFocus,
 }: {
   label: string;
@@ -20,7 +21,10 @@ export function RecipientsInput({
   onChange: (next: Address[]) => void;
   removeLabel: (email: string) => string;
   invalidLabel: string;
-  trailing?: ReactNode;
+  /** Shown while the field is empty (the collapsed "To, Cc, Bcc" line). */
+  placeholder?: string;
+  /** Keeps the label for assistive technology only. */
+  hideLabel?: boolean;
   autoFocus?: boolean;
 }) {
   const id = useId();
@@ -55,12 +59,15 @@ export function RecipientsInput({
 
   return (
     <div
-      className="flex min-w-0 items-start gap-2 border-b border-border px-4 py-1.5"
+      className="flex min-w-0 items-start gap-2 py-0.5"
       onClick={(event) => {
         if (event.target === event.currentTarget) inputRef.current?.focus();
       }}
     >
-      <label htmlFor={id} className="flex h-8 w-11 shrink-0 items-center text-sm text-foreground-subtle touch:h-10">
+      <label
+        htmlFor={id}
+        className={cn("flex h-8 w-11 shrink-0 items-center text-sm text-foreground-subtle touch:h-10", hideLabel && "sr-only")}
+      >
         {label}
       </label>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -99,14 +106,14 @@ export function RecipientsInput({
           spellCheck={false}
           autoFocus={autoFocus}
           value={text}
+          placeholder={value.length === 0 ? placeholder : undefined}
           onChange={(event) => setText(event.target.value)}
           onKeyDown={onKeyDown}
           onPaste={onPaste}
           onBlur={() => text.trim() && commit(text)}
-          className="h-8 min-w-24 flex-1 basis-24 bg-transparent text-sm text-foreground outline-none touch:h-10"
+          className="h-8 min-w-24 flex-1 basis-24 bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-subtle touch:h-10"
         />
       </div>
-      {trailing ? <div className="flex h-8 shrink-0 items-center touch:h-10">{trailing}</div> : null}
     </div>
   );
 }

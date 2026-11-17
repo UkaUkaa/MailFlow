@@ -1,5 +1,6 @@
 "use client";
 
+import { ImageOff, Languages, SunMoon } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { LanguageSwitch, ThemeSwitch } from "@/shared/components/layout/preferences";
@@ -16,8 +17,8 @@ export function AppearanceSettings() {
 
   return (
     <SettingsPage title={t("title")} description={t("description")}>
-      <SettingsCard>
-        <SettingsRow title={t("theme")} description={t("themeDescription")}>
+      <SettingsCard flat>
+        <SettingsRow icon={SunMoon} title={t("theme")} description={t("themeDescription")}>
           <ThemeSwitch
             label={t("theme")}
             showNames
@@ -26,7 +27,7 @@ export function AppearanceSettings() {
             onChange={(theme) => update.mutate({ theme }, { onError })}
           />
         </SettingsRow>
-        <SettingsRow title={t("language")} description={t("languageDescription")}>
+        <SettingsRow icon={Languages} title={t("language")} description={t("languageDescription")}>
           <LanguageSwitch
             label={t("language")}
             showNames
@@ -34,22 +35,14 @@ export function AppearanceSettings() {
             onChange={(locale) => update.mutate({ locale }, { onError })}
           />
         </SettingsRow>
-      </SettingsCard>
-      <SettingsCard>
-        <div className="flex min-w-0 items-center gap-4 p-4">
-          <div className="min-w-0 flex-1">
-            <p id="remote-images-label" className="text-sm font-medium break-words text-foreground">
-              {t("remoteImages")}
-            </p>
-            <p className="mt-0.5 text-[13px] break-words text-foreground-muted">{t("remoteImagesDescription")}</p>
-          </div>
+        <SettingsRow icon={ImageOff} inline title={t("remoteImages")} titleId="remote-images-label" description={t("remoteImagesDescription")}>
           <Switch
             aria-labelledby="remote-images-label"
             checked={settings.data?.load_remote_images ?? false}
             disabled={!settings.data}
             onCheckedChange={(checked) => update.mutate({ load_remote_images: checked }, { onError })}
           />
-        </div>
+        </SettingsRow>
       </SettingsCard>
     </SettingsPage>
   );

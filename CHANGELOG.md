@@ -61,7 +61,32 @@
 - `/accounts/oauth/outlook/start` answers 503 `provider_not_configured` instead of 404 when
   Outlook is not configured.
 
+### Changed
+- Frontend layout reworked after `docs/design/SPARK_REFERENCE.md` (layout and behaviour only;
+  MailFlow's own palette, mark and Lucide icons):
+  - navigation: 70px icon rail from 768px with tooltips, a flyout with the full navigation
+    (keyboard operable, focus returns) and an optional pinned sidebar; phones keep bottom
+    navigation and drawer;
+  - thread list: date groups (Today … month + year, browser time zone, locale week start),
+    88px three-line rows with avatars, count chip, gutter quick actions on hover and keyboard
+    focus, accent-tint selection, search and new-message icons in the header;
+  - reader: toolbar pill (back | archive) and icon buttons, messages as bordered cards with
+    per-message reply / forward, collapsed quoted history, compact draft card (Edit / Delete),
+    glyph-only empty pane;
+  - composer: document-like page beside the rail from 768px, replies docked in the reading pane
+    from 1024px (expand / dock), one "To, Cc, Bcc" line that opens on focus;
+  - search: a mode of the list pane with in-memory recent queries; Escape returns to the list;
+  - settings: modal dialog over the mail workspace from 768px (deep links and the OAuth return
+    open it directly), full pages on phones.
+- Design tokens: new `--rail`; neutrals re-tuned into three tonal steps in both themes;
+  `--warning`, `--success`, `--danger` (light) and `--accent` (dark) adjusted; contrast table in
+  `DESIGN_SYSTEM.md`.
+- Removed strings `nav.toggleSidebar`, `composer.minimize`, `composer.ccBcc`,
+  `mail.searchPrompt*`; the floating, minimizable composer is gone.
+
 ### Fixed
+- Escape did not close the composer while the caret was in the message body.
+- Closing the phone drawer did not return focus to the menu button.
 - Search by email address returned nothing (tsquery tokenisation).
 - A conversation left an empty stale row when a draft moved to another thread.
 - Hydration mismatch when the page was delivered buffered behind Nginx (theme script in `<head>`).

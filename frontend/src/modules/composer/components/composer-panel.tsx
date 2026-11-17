@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, ChevronUp, Minus, Paperclip, Send, Trash2, X } from "lucide-react";
+import { ChevronDown, Maximize2, Minimize2, Paperclip, Send, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { toast } from "sonner";
@@ -19,6 +19,7 @@ import { Button } from "@/shared/components/ui/button";
 import { NativeSelect } from "@/shared/components/ui/input";
 import { Tooltip } from "@/shared/components/ui/tooltip";
 import { useDebouncedCallback } from "@/shared/hooks/use-debounced-callback";
+import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { cn } from "@/shared/lib/cn";
 import type { Address } from "@/shared/types/address";
 import { createDraft, deleteDraft, sendEmail, updateDraft } from "../api";
@@ -31,6 +32,17 @@ import { EditorToolbar, RichTextArea, useRichTextEditor } from "./rich-text-edit
 type SaveState = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY_MS = 1500;
 
+/** Small bordered square button of the composer's window controls. */
+const square = "md:size-7 md:rounded-sm md:border md:border-border-strong";
+
+/**
+ * The composer has three presentations of one form:
+ * - phone: a full-screen sheet sized to the visual viewport;
+ * - tablet and wider: a document-like page that takes over the list and reading panes (the
+ *   navigation rail stays);
+ * - replies and forwards on desktop (≥ 1024px): a panel docked at the bottom right of the
+ *   reading pane, which can be expanded to the page and docked again.
+ */
 export function ComposerPanel({ session, onClose }: { session: ComposeSession; onClose: () => void }) {
   const t = useTranslations("composer");
   const tc = useTranslations("common");
@@ -44,18 +56,25 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
   const fromId = useId();
   const subjectId = useId();
 
+  // Docked vs. page is an interaction difference, so it is decided in script (the panel is
+  // client-only); phone vs. page is plain CSS.
+  const desktop = useMediaQuery("(min-width: 64rem)");
+  const [expanded, setExpanded] = useState(false);
+  const dockable = session.mode !== "new" && desktop;
+  const docked = dockable && !expanded;
+
   const [accountId, setAccountId] = useState(session.accountId);
   const [to, setTo] = useState<Address[]>(session.to);
   const [cc, setCc] = useState<Address[]>(session.cc);
   const [bcc, setBcc] = useState<Address[]>(session.bcc);
-  const [showCc, setShowCc] = useState(session.cc.length > 0 || session.bcc.length > 0);
+  // One "To, Cc, Bcc" line until the recipients get focus (or there is a copy to show).
+  const [recipientsOpen, setRecipientsOpen] = useState(session.cc.length > 0 || session.bcc.length > 0);
   const [subject, setSubject] = useState(session.subject);
   const [bodyEmpty, setBodyEmpty] = useState(!session.bodyHtml);
   const [files, setFiles] = useState<File[]>([]);
   const [forwarded, setForwarded] = useState<Attachment[]>(session.forwardAttachments);
   const [includeQuote, setIncludeQuote] = useState(Boolean(session.quotedHtml));
   const [showQuote, setShowQuote] = useState(false);
-  const [minimized, setMinimized] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -256,7 +275,13 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
     if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       void send();
-    } else if (event.key === "Escape" && !event.defaultPrevented && !confirmDiscard && !confirmNoSubject) {
+    }
+  };
+  // Capture phase: the rich-text editor consumes Escape, so a bubbling handler never sees it
+  // while the caret is in the message body.
+  const onKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" && !event.defaultPrevented && !confirmDiscard && !confirmNoSubject) {
+      event.preventDefault();
       event.stopPropagation();
       void close();
     }
@@ -266,13 +291,97 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
   const closeLabel = draftsSupported ? t("close") : tc("close");
   const saveLabel =
     saveState === "saving" ? t("saving") : saveState === "saved" ? t("saved") : saveState === "error" ? t("saveError") : "";
+  const sendShortcut = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ Enter" : "Ctrl Enter";
+  const chooseFrom = activeAccounts.length > 1 || !accountId;
 
-  const sendButton = (className?: string) => (
-    <Button variant="primary" loading={sending} onClick={() => void send()} className={className}>
-      <Send className="size-4" aria-hidden />
-      {t("send")}
-    </Button>
+  const sendButton = (
+    <Tooltip label={t("send")} shortcut={sendShortcut}>
+      <Button variant="primary" size={docked ? "sm" : "md"} loading={sending} onClick={() => void send()} className="shrink-0">
+        <Send className="size-4" aria-hidden />
+        {t("send")}
+      </Button>
+    </Tooltip>
   );
+
+  const closeButton = (
+    <Tooltip label={closeLabel} shortcut="Esc">
+      <Button variant="ghost" size="icon" aria-label={closeLabel} onClick={() => void close()} className={cn("shrink-0", square)}>
+        <X />
+      </Button>
+    </Tooltip>
+  );
+
+  const attachButton = (className?: string) => (
+    <Tooltip label={t("attach")}>
+      <Button asChild variant="ghost" size="icon" className={className}>
+        <label
+          htmlFor={fileInputId}
+          role="button"
+          tabIndex={0}
+          aria-label={t("attach")}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              document.getElementById(fileInputId)?.click();
+            }
+          }}
+        >
+          <Paperclip />
+        </label>
+      </Button>
+    </Tooltip>
+  );
+
+  const discardButton = (className?: string) => (
+    <Tooltip label={t("discard")}>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={t("discard")}
+        className={className}
+        onClick={() => (hasContent || draftIdRef.current ? setConfirmDiscard(true) : void discard())}
+      >
+        <Trash2 />
+      </Button>
+    </Tooltip>
+  );
+
+  const fromOptions = (
+    <>
+      {!accountId ? <option value="">{t("chooseAccount")}</option> : null}
+      {activeAccounts.map((account) => (
+        <option key={account.id} value={account.id}>
+          {account.display_name ? `${accountLabel(account)} <${account.email_address}>` : account.email_address}
+        </option>
+      ))}
+    </>
+  );
+  const onFromChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setAccountId(event.target.value || null);
+    touch();
+  };
+
+  const subjectInput = (className: string) => (
+    <>
+      <label htmlFor={subjectId} className="sr-only">
+        {t("subject")}
+      </label>
+      <input
+        id={subjectId}
+        value={subject}
+        maxLength={998}
+        placeholder={t("subject")}
+        autoFocus={session.mode === "new"}
+        onChange={(event) => {
+          setSubject(event.target.value);
+          touch();
+        }}
+        className={cn("w-full min-w-0 bg-transparent font-semibold text-foreground outline-none placeholder:text-foreground-subtle", className)}
+      />
+    </>
+  );
+
+  const recipient = { removeLabel: (email: string) => t("removeRecipient", { email }), invalidLabel: t("invalidAddress") };
 
   return (
     <>
@@ -280,154 +389,131 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
         ref={panelRef}
         role="dialog"
         aria-label={title}
+        data-layout={docked ? "docked" : "page"}
         onKeyDown={onKeyDown}
+        onKeyDownCapture={onKeyDownCapture}
         className={cn(
-          "fixed z-40 flex min-w-0 flex-col bg-surface-raised",
-          // Phone: full screen, sized to the visual viewport so nothing hides behind the keyboard.
-          "inset-x-0 top-[var(--vvt,0px)] h-[var(--vvh,100dvh)]",
-          // Tablet and up: floating panel anchored bottom-right.
-          "md:inset-x-auto md:top-auto md:right-6 md:bottom-0 md:w-[min(36rem,calc(100vw-6rem))] md:rounded-t-lg md:border md:border-b-0 md:border-border md:shadow-lg",
-          minimized ? "md:h-12" : "md:h-[min(40rem,calc(100dvh-4rem))]",
+          "fixed z-40 flex min-w-0 flex-col",
+          docked
+            ? "right-3 bottom-3 h-[380px] max-h-[calc(100dvh-5rem)] w-[520px] overflow-hidden rounded-lg border border-border bg-surface-raised shadow-lg animate-pop-in"
+            : // Sized to the visual viewport so nothing hides behind an on-screen keyboard; from
+              // `md` it starts after the navigation column instead of covering it.
+              "inset-x-0 top-[var(--vvt,0px)] h-[var(--vvh,100dvh)] bg-background md:left-[var(--nav-offset)]",
         )}
       >
-        <header className="flex h-14 shrink-0 items-center gap-1 border-b border-border px-2 pt-safe md:h-12 md:pr-2 md:pl-4">
-          <Button variant="ghost" size="icon" className="md:hidden" aria-label={closeLabel} onClick={() => void close()}>
-            <X />
-          </Button>
-          <button
-            type="button"
-            onClick={() => setMinimized((value) => !value)}
-            tabIndex={-1}
-            className="flex min-w-0 flex-1 items-baseline gap-2 text-left max-md:pointer-events-none"
-          >
-            <h2 className="min-w-0 truncate text-base font-semibold text-foreground md:text-sm">
-              {minimized && subject.trim() ? subject : title}
-            </h2>
+        {docked ? (
+          <header className="flex h-12 shrink-0 items-center gap-2 pr-3 pl-4">
+            <div className="min-w-0 flex-1">{subjectInput("h-8 text-sm text-ellipsis")}</div>
             <span aria-live="polite" className="shrink-0 text-xs text-foreground-subtle">
               {saveLabel}
             </span>
-          </button>
-          {sendButton("md:hidden")}
-          <div className="hidden items-center md:flex">
-            <Tooltip label={minimized ? t("expand") : t("minimize")}>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={minimized ? t("expand") : t("minimize")}
-                onClick={() => setMinimized((value) => !value)}
+            <Tooltip label={t("expand")}>
+              <Button variant="ghost" size="icon" aria-label={t("expand")} onClick={() => setExpanded(true)} className={square}>
+                <Maximize2 />
+              </Button>
+            </Tooltip>
+            {closeButton}
+          </header>
+        ) : (
+          <header className="flex h-14 shrink-0 items-center gap-1 px-2 pt-safe md:gap-2 md:px-4">
+            {closeButton}
+            {dockable ? (
+              <Tooltip label={t("dock")}>
+                <Button variant="ghost" size="icon" aria-label={t("dock")} onClick={() => setExpanded(false)} className={square}>
+                  <Minimize2 />
+                </Button>
+              </Tooltip>
+            ) : null}
+            <div className="flex min-w-0 flex-1 items-baseline gap-2 px-1">
+              <h2 className="min-w-0 truncate text-base font-semibold text-foreground md:sr-only">{title}</h2>
+              <span aria-live="polite" className="shrink-0 text-xs text-foreground-subtle">
+                {saveLabel}
+              </span>
+            </div>
+            {attachButton("max-md:hidden")}
+            {discardButton("max-md:hidden")}
+            {chooseFrom ? (
+              <NativeSelect
+                aria-label={t("from")}
+                value={accountId ?? ""}
+                onChange={onFromChange}
+                className="w-auto max-w-[16rem] border-transparent bg-transparent text-foreground-muted hover:border-transparent max-md:hidden"
               >
-                {minimized ? <ChevronUp /> : <Minus />}
-              </Button>
-            </Tooltip>
-            <Tooltip label={closeLabel}>
-              <Button variant="ghost" size="icon" aria-label={closeLabel} onClick={() => void close()}>
-                <X />
-              </Button>
-            </Tooltip>
-          </div>
-        </header>
+                {fromOptions}
+              </NativeSelect>
+            ) : null}
+            {sendButton}
+          </header>
+        )}
 
-        <div className={cn("flex min-h-0 flex-1 flex-col", minimized && "md:hidden")}>
-          <div className="scrollbar-thin min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
-            {activeAccounts.length > 1 || !accountId ? (
-              <div className="flex min-w-0 items-center gap-2 border-b border-border px-4 py-1.5">
+        <div className="scrollbar-thin min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+          <div className={cn("w-full min-w-0", docked ? "px-4 pb-3" : "px-4 pt-1 pb-4 md:max-w-[44rem] md:px-8 md:pt-6 lg:max-w-[750px] lg:pl-[78px]")}>
+            {chooseFrom ? (
+              <div className={cn("flex min-w-0 items-center gap-2", !docked && "md:hidden")}>
                 <label htmlFor={fromId} className="w-11 shrink-0 text-sm text-foreground-subtle">
                   {t("from")}
                 </label>
                 <NativeSelect
                   id={fromId}
                   value={accountId ?? ""}
-                  onChange={(event) => {
-                    setAccountId(event.target.value || null);
-                    touch();
-                  }}
+                  onChange={onFromChange}
                   className="min-w-0 flex-1 border-transparent bg-transparent px-0 hover:border-transparent"
                 >
-                  {!accountId ? <option value="">{t("chooseAccount")}</option> : null}
-                  {activeAccounts.map((account) => (
-                    <option key={account.id} value={account.id}>
-                      {account.display_name ? `${accountLabel(account)} <${account.email_address}>` : account.email_address}
-                    </option>
-                  ))}
+                  {fromOptions}
                 </NativeSelect>
               </div>
             ) : null}
             {!draftsSupported ? (
-              <p role="note" className="border-b border-border bg-surface px-4 py-2 text-[13px] break-words text-foreground-muted">
+              <p role="note" className="mb-2 rounded-md bg-muted px-3 py-2 text-[13px] break-words text-foreground-muted">
                 {t("draftsUnavailable")}
               </p>
             ) : null}
 
-            <RecipientsInput
-              label={t("to")}
-              value={to}
-              autoFocus={session.mode === "new" || session.mode === "forward"}
-              onChange={(next) => {
-                setTo(next);
-                touch();
-              }}
-              removeLabel={(email) => t("removeRecipient", { email })}
-              invalidLabel={t("invalidAddress")}
-              trailing={
-                <button
-                  type="button"
-                  aria-expanded={showCc}
-                  onClick={() => setShowCc((value) => !value)}
-                  className="inline-flex h-8 items-center gap-0.5 rounded-sm px-1.5 text-[13px] text-foreground-muted hover:text-foreground touch:h-10 touch:px-2"
-                >
-                  {t("ccBcc")}
-                  <ChevronDown className={cn("size-3.5 transition-transform", showCc && "rotate-180")} aria-hidden />
-                </button>
-              }
-            />
-            {showCc ? (
-              <>
-                <RecipientsInput
-                  label={t("cc")}
-                  value={cc}
-                  onChange={(next) => {
-                    setCc(next);
-                    touch();
-                  }}
-                  removeLabel={(email) => t("removeRecipient", { email })}
-                  invalidLabel={t("invalidAddress")}
-                />
-                <RecipientsInput
-                  label={t("bcc")}
-                  value={bcc}
-                  onChange={(next) => {
-                    setBcc(next);
-                    touch();
-                  }}
-                  removeLabel={(email) => t("removeRecipient", { email })}
-                  invalidLabel={t("invalidAddress")}
-                />
-              </>
-            ) : null}
+            {docked ? null : <div className="pb-1">{subjectInput("h-12 text-lg md:h-14 md:text-[22px]")}</div>}
 
-            <div className="border-b border-border px-4">
-              <label htmlFor={subjectId} className="sr-only">
-                {t("subject")}
-              </label>
-              <input
-                id={subjectId}
-                value={subject}
-                maxLength={998}
-                placeholder={t("subject")}
-                onChange={(event) => {
-                  setSubject(event.target.value);
+            <div onFocus={() => setRecipientsOpen(true)}>
+              <RecipientsInput
+                label={t("to")}
+                value={to}
+                hideLabel={!recipientsOpen && to.length === 0}
+                placeholder={recipientsOpen ? undefined : t("recipientsPlaceholder")}
+                autoFocus={session.mode === "forward"}
+                onChange={(next) => {
+                  setTo(next);
                   touch();
                 }}
-                className="h-11 w-full min-w-0 bg-transparent text-sm font-medium text-foreground outline-none placeholder:font-normal placeholder:text-foreground-subtle"
+                {...recipient}
               />
+              {recipientsOpen ? (
+                <>
+                  <RecipientsInput
+                    label={t("cc")}
+                    value={cc}
+                    onChange={(next) => {
+                      setCc(next);
+                      touch();
+                    }}
+                    {...recipient}
+                  />
+                  <RecipientsInput
+                    label={t("bcc")}
+                    value={bcc}
+                    onChange={(next) => {
+                      setBcc(next);
+                      touch();
+                    }}
+                    {...recipient}
+                  />
+                </>
+              ) : null}
             </div>
 
-            <div className="px-4 py-3" onClick={() => editor?.isFocused || editor?.commands.focus()}>
+            <div className="py-3" onClick={() => editor?.isFocused || editor?.commands.focus()}>
               <RichTextArea editor={editor} />
             </div>
 
             {session.quotedHtml ? (
-              <div className="mx-4 mb-3 rounded-md border border-border">
+              <div className="mb-3 rounded-md border border-border">
                 <div className="flex min-w-0 items-center gap-2 px-3 py-1">
                   <button
                     type="button"
@@ -464,81 +550,62 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
             ) : null}
 
             {files.length + forwarded.length > 0 ? (
-              <div className="px-4 pb-3">
-                <AttachmentList label={t("attachments")}>
-                  {forwarded.map((attachment) => (
-                    <li key={attachment.id}>
-                      <AttachmentChip
-                        filename={attachment.filename}
-                        mimeType={attachment.mime_type}
-                        size={attachment.size}
-                        removeLabel={t("removeAttachment")}
-                        onRemove={() => {
-                          setForwarded((current) => current.filter((item) => item.id !== attachment.id));
-                          touch();
-                        }}
-                      />
-                    </li>
-                  ))}
-                  {files.map((file, index) => (
-                    <li key={`${file.name}-${file.size}-${index}`}>
-                      <AttachmentChip
-                        filename={file.name}
-                        mimeType={file.type || "application/octet-stream"}
-                        size={file.size}
-                        removeLabel={t("removeAttachment")}
-                        onRemove={() => {
-                          setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
-                          touch();
-                        }}
-                      />
-                    </li>
-                  ))}
-                </AttachmentList>
-              </div>
+              <AttachmentList label={t("attachments")}>
+                {forwarded.map((attachment) => (
+                  <li key={attachment.id}>
+                    <AttachmentChip
+                      filename={attachment.filename}
+                      mimeType={attachment.mime_type}
+                      size={attachment.size}
+                      removeLabel={t("removeAttachment")}
+                      onRemove={() => {
+                        setForwarded((current) => current.filter((item) => item.id !== attachment.id));
+                        touch();
+                      }}
+                    />
+                  </li>
+                ))}
+                {files.map((file, index) => (
+                  <li key={`${file.name}-${file.size}-${index}`}>
+                    <AttachmentChip
+                      filename={file.name}
+                      mimeType={file.type || "application/octet-stream"}
+                      size={file.size}
+                      removeLabel={t("removeAttachment")}
+                      onRemove={() => {
+                        setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+                        touch();
+                      }}
+                    />
+                  </li>
+                ))}
+              </AttachmentList>
             ) : null}
           </div>
-
-          {error ? (
-            <p role="alert" className="border-t border-border bg-danger-soft px-4 py-2 text-[13px] break-words text-danger">
-              {error}
-            </p>
-          ) : null}
-
-          <footer className="flex shrink-0 items-center gap-1 border-t border-border px-2 py-1.5 pb-[max(0.375rem,env(safe-area-inset-bottom))] md:px-3">
-            {sendButton("mr-1 hidden md:inline-flex")}
-            <EditorToolbar editor={editor} className="flex-1" />
-            <input id={fileInputId} type="file" multiple hidden onChange={addFiles} />
-            <Tooltip label={t("attach")}>
-              <Button asChild variant="ghost" size="icon">
-                <label
-                  htmlFor={fileInputId}
-                  role="button"
-                  tabIndex={0}
-                  aria-label={t("attach")}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      document.getElementById(fileInputId)?.click();
-                    }
-                  }}
-                >
-                  <Paperclip />
-                </label>
-              </Button>
-            </Tooltip>
-            <Tooltip label={t("discard")}>
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t("discard")}
-                onClick={() => (hasContent || draftIdRef.current ? setConfirmDiscard(true) : void discard())}
-              >
-                <Trash2 />
-              </Button>
-            </Tooltip>
-          </footer>
         </div>
+
+        {error ? (
+          <p role="alert" className="border-t border-border bg-danger-soft px-4 py-2 text-[13px] break-words text-danger">
+            {error}
+          </p>
+        ) : null}
+
+        {/*
+          Formatting stays one tap away at every size: a selection-only toolbar would be
+          unreachable on touch screens. On the docked panel the bar also carries the actions.
+        */}
+        <footer
+          className={cn(
+            "flex shrink-0 items-center gap-1 border-t border-border px-2 py-1.5",
+            docked ? "pr-3" : "pb-[max(0.375rem,env(safe-area-inset-bottom))] md:px-6 lg:pl-[70px]",
+          )}
+        >
+          <EditorToolbar editor={editor} className="flex-1" />
+          <input id={fileInputId} type="file" multiple hidden onChange={addFiles} />
+          {attachButton(docked ? undefined : "md:hidden")}
+          {discardButton(docked ? undefined : "md:hidden")}
+          {docked ? sendButton : null}
+        </footer>
       </div>
 
       <ResponsiveDialog

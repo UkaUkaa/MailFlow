@@ -7,6 +7,7 @@ import { SettingsSync } from "@/modules/settings";
 import { SessionGuard } from "@/infrastructure/authentication";
 import { AppShell } from "@/shared/components/layout/app-shell";
 import { BottomNav } from "./bottom-nav";
+import { Rail } from "./rail";
 import { SidebarContent } from "./sidebar-content";
 
 /** Composition root of the signed-in area: session, composer and the responsive frame. */
@@ -20,6 +21,7 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
         <AppShell
           drawerTitle={t("menu")}
           closeLabel={tc("close")}
+          rail={<Rail />}
           sidebar={(variant) => <SidebarContent variant={variant} />}
           bottomNav={<BottomNav />}
         >
