@@ -87,9 +87,7 @@ async def runtime(settings: Settings, owner_engine: AsyncEngine) -> AsyncIterato
         )
         names = ", ".join(row[0] for row in tables)
         await conn.execute(text(f"TRUNCATE {names} CASCADE"))
-    rt = Runtime.create(
-        settings, sync_queue=RecordingQueue(), outbox_queue=RecordingOutboxQueue()
-    )
+    rt = Runtime.create(settings, sync_queue=RecordingQueue(), outbox_queue=RecordingOutboxQueue())
     rt.registry = FakeRegistry()
     await rt.redis.flushdb()
     yield rt

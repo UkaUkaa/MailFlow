@@ -117,9 +117,7 @@ async def test_cancel_inside_the_undo_window_prevents_the_send(
     assert body["status"] == "cancelled"
     assert body["subject"] == "Hello" and body["to"][0]["email"] == "dest@example.com"
     assert "Body" in body["body_html"]
-    assert body["attachments"] == [
-        {"filename": "notes.txt", "mime_type": "text/plain", "size": 14}
-    ]
+    assert body["attachments"] == [{"filename": "notes.txt", "mime_type": "text/plain", "size": 14}]
 
     clock.advance(seconds=60)
     assert await dispatcher.run(alice.user_id, uuid.UUID(outbox_id)) == "skipped"
@@ -199,9 +197,7 @@ async def test_send_later_lists_reschedules_and_sends(
     assert items[0]["snippet"] == "Body text" and "body_html" not in items[0]
 
     # Move it a day later: the original time passes without a send.
-    moved = await alice.client.patch(
-        f"{OUTBOX}/{outbox_id}", json={"send_at": _at(clock, days=1)}
-    )
+    moved = await alice.client.patch(f"{OUTBOX}/{outbox_id}", json={"send_at": _at(clock, days=1)})
     assert moved.status_code == 200, moved.text
     clock.advance(hours=3)
     assert await dispatcher.run(alice.user_id, outbox_id) == "skipped"
@@ -214,9 +210,7 @@ async def test_send_later_lists_reschedules_and_sends(
     assert mailbox.sent[0].attachments[0].content == b"attached notes"
     assert (await alice.client.get(OUTBOX)).json()["items"] == []
     # A sent message cannot be rescheduled.
-    again = await alice.client.patch(
-        f"{OUTBOX}/{outbox_id}", json={"send_at": _at(clock, hours=1)}
-    )
+    again = await alice.client.patch(f"{OUTBOX}/{outbox_id}", json={"send_at": _at(clock, hours=1)})
     assert again.status_code == 409 and again.json()["error"]["code"] == "outbox_not_editable"
 
 
@@ -334,9 +328,7 @@ async def test_worker_that_died_after_sending_does_not_send_again(
     assert detail["status"] == "sent"
 
 
-async def test_provider_outage_is_retried_then_reported(
-    alice, registry, runner, dispatcher, clock
-):
+async def test_provider_outage_is_retried_then_reported(alice, registry, runner, dispatcher, clock):
     account_id, mailbox = await _mailbox(alice, registry, runner)
     response = await _send(alice, _payload(account_id))
     outbox_id = uuid.UUID(response.json()["outbox_id"])
@@ -477,7 +469,6 @@ async def test_scan_skips_deactivated_users(alice, registry, runner, runtime, ow
         await conn.execute(text("UPDATE users SET status = 'deactivated'"))
     queue = RecordingOutboxQueue()
     assert await dispatch_due_outbox(runtime, queue) == 0
-
 
 
 # -- user time zone ------------------------------------------------------------------------
