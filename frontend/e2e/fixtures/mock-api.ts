@@ -12,6 +12,8 @@ export interface MockOptions {
   googleSignIn?: boolean;
   /** Make every authenticated call answer 401 after this many requests (session expiry). */
   expireAfter?: number;
+  /** Override saved user settings, e.g. a user who turned remote images off. */
+  settings?: Partial<typeof settings>;
 }
 
 export interface RecordedCall {
@@ -48,7 +50,7 @@ const PUBLIC = /^\/auth\/(csrf|login|register|verify-email|resend-verification|p
 export async function mockApi(page: Page, options: MockOptions = {}): Promise<MockApi> {
   const state = {
     authenticated: options.authenticated ?? true,
-    settings: { ...settings },
+    settings: { ...settings, ...options.settings },
     // Cloned so one test renaming an account cannot leak into the next test in the same worker.
     accounts: structuredClone(options.accounts ?? accounts),
     threads: makeThreads(45),

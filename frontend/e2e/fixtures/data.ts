@@ -79,7 +79,7 @@ export const imapAccount: AccountFixture = {
 export const settings = {
   locale: "en",
   theme: "system",
-  load_remote_images: false,
+  load_remote_images: true,
   conversation_view: true,
   list_density: "comfortable",
   list_preview_lines: 1,

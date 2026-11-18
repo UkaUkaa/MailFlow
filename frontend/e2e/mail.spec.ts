@@ -123,9 +123,8 @@ test.describe("reading", () => {
     );
   });
 
-  test("renders email HTML in a script-less sandbox with remote images blocked", async ({ page }) => {
+  test("renders email HTML in a script-less sandbox and loads remote images by default", async ({ page }) => {
     await mockApi(page);
-    // Counts requests that actually reach the network (CSP-blocked ones never do).
     const remote: string[] = [];
     await page.route("**://tracker.example/**", (route) => {
       remote.push(route.request().url());
@@ -140,6 +139,24 @@ test.describe("reading", () => {
     expect(sandbox).not.toContain("allow-top-navigation");
     const srcdoc = (await frame.getAttribute("srcdoc")) ?? "";
     expect(srcdoc).toContain("default-src 'none'");
+    expect(srcdoc).toContain("img-src data: cid: https: http:");
+    await expect(page.getByText("Remote images are hidden")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Show images" })).toHaveCount(0);
+    await expect.poll(() => remote.length).toBeGreaterThan(0);
+  });
+
+  test("blocks remote images for a user who turned them off until asked", async ({ page }) => {
+    await mockApi(page, { settings: { load_remote_images: false } });
+    // Counts requests that actually reach the network (CSP-blocked ones never do).
+    const remote: string[] = [];
+    await page.route("**://tracker.example/**", (route) => {
+      remote.push(route.request().url());
+      return route.fulfill({ status: 200, contentType: "image/gif", body: "" });
+    });
+    await page.goto("/en/mail/inbox/thread-1");
+    const frame = page.locator("iframe[title='Message from Marta Shevchenko']").last();
+    await expect(frame).toBeVisible();
+    const srcdoc = (await frame.getAttribute("srcdoc")) ?? "";
     expect(srcdoc).toContain("img-src data: cid:;");
     expect(srcdoc).not.toContain("tracker.example");
 
