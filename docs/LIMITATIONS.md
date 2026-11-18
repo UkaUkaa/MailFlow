@@ -184,5 +184,7 @@ Honest list of what is missing or partial. Update whenever something here change
   on time, but there is no Undo toast (cancel is not offered for undo-window items elsewhere).
   Pressing Undo while another composer is open replaces that composer.
 - A scheduled message that was started from a draft keeps that draft in Drafts until it is sent.
-- Scheduled times are absolute instants; presets are computed in the browser's time zone. There
-  is no per-user time-zone setting and no recurring sends. Snooze is not implemented.
+- Scheduled times are stored as absolute instants. The time zone comes from the device (the
+  `mf_tz` cookie), not from IP geolocation or a saved per-user setting, so a message scheduled
+  for 08:00 goes out at 08:00 of the zone the user was in when scheduling. No recurring sends.
+  Snooze is not implemented.

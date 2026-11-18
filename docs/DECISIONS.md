@@ -324,6 +324,14 @@ closed tab would defeat. Approved as an addition to the MVP scope.
   Vault — all inside the compose path the API uses. Provider outages are retried three times with
   backoff (`next_attempt_at`; `send_at` shown to the user does not move); other errors fail the
   item, which then shows in the Scheduled view with retry (reschedule) and cancel.
+- **User time.** The user picks a time on their own clock. The browser stores the device's IANA
+  time zone in the `mf_tz` cookie (not HttpOnly, `SameSite=Lax`, refreshed on every load and
+  before every scheduled send, so it follows where the person is) and sends the picked moment
+  as local wall-clock time; the server validates the zone against the IANA database and converts
+  to UTC, which is all it stores. The cookie only interprets the caller's own input, so a forged
+  value can do no more than shift the caller's own send time. A wall time that occurs twice when
+  clocks go back means its first occurrence. On load the page prints the user's time, zone and
+  offset to the browser console.
 - **Cost.** With undo on, sending depends on a running worker and beat; a queued message is
   rejected up front for everything that can be checked without the provider, but a provider
   refusal is reported in the Scheduled view rather than in the composer. Migration 0001 now

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
@@ -244,7 +244,8 @@ async def test_send_at_validation(alice, registry, runner, clock):
 
     assert await problem(_at(clock, minutes=-5)) == "in_past"
     assert await problem(_at(clock, days=400)) == "too_far"
-    await problem("2030-01-01T10:00:00")  # no UTC offset: ambiguous, rejected
+    # Local time without knowing the user's time zone cannot be placed on the timeline.
+    assert await problem("2030-01-01T10:00:00") == "timezone_required"
     # The same checks a direct send makes are made before anything is queued.
     no_recipient = await _send(alice, _payload(account_id, to=[], send_at=_at(clock, hours=1)))
     assert no_recipient.status_code == 422
@@ -477,3 +478,50 @@ async def test_scan_skips_deactivated_users(alice, registry, runner, runtime, ow
     queue = RecordingOutboxQueue()
     assert await dispatch_due_outbox(runtime, queue) == 0
 
+
+
+# -- user time zone ------------------------------------------------------------------------
+
+
+async def test_local_time_is_converted_from_the_users_time_zone(
+    alice, registry, runner, clock, owner_engine
+):
+    """The user picks a wall-clock time; the ``mf_tz`` cookie says where they are; the server
+    stores and sends at the corresponding UTC moment."""
+    from zoneinfo import ZoneInfo
+
+    account_id, _ = await _mailbox(alice, registry, runner)
+    kyiv = ZoneInfo("Europe/Kyiv")
+    local = (clock.now().astimezone(kyiv) + timedelta(days=30)).replace(
+        hour=9, minute=0, second=0, microsecond=0
+    )
+    wall = local.replace(tzinfo=None).isoformat()  # e.g. 2026-12-18T09:00:00, no offset
+    alice.client.cookies.set("mf_tz", "Europe/Kyiv")
+
+    response = await _send(alice, _payload(account_id, send_at=wall))
+    assert response.status_code == 202, response.text
+    stored = datetime.fromisoformat(response.json()["send_at"])
+    assert stored == local  # the same instant...
+    assert stored.utcoffset() == timedelta(0)  # ...reported in server time (UTC)
+
+    # Rescheduling reads local time the same way, from wherever the user is now.
+    alice.client.cookies.set("mf_tz", "America/New_York")
+    moved = await alice.client.patch(
+        f"{OUTBOX}/{response.json()['outbox_id']}", json={"send_at": wall}
+    )
+    assert moved.status_code == 200, moved.text
+    expected = local.replace(tzinfo=ZoneInfo("America/New_York"))
+    assert datetime.fromisoformat(moved.json()["send_at"]) == expected
+
+    # A time with its own offset does not depend on the cookie.
+    explicit = await _send(alice, _payload(account_id, send_at=local.isoformat()))
+    assert datetime.fromisoformat(explicit.json()["send_at"]) == local
+
+
+async def test_unknown_time_zone_cookie_is_rejected(alice, registry, runner):
+    account_id, _ = await _mailbox(alice, registry, runner)
+    for bogus in ("Mars/Olympus", "../../etc/passwd", ""):
+        alice.client.cookies.set("mf_tz", bogus)
+        response = await _send(alice, _payload(account_id, send_at="2030-01-01T10:00:00"))
+        assert response.status_code == 422, (bogus, response.text)
+        assert response.json()["error"]["details"][0]["code"] == "timezone_required"

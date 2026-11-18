@@ -67,9 +67,9 @@ for (const device of DEVICES) {
       expect(sends).toHaveLength(1);
       const scheduled = sendPayload(sends[0]?.body ?? null);
       expect(scheduled).toMatchObject({ subject: "Lunch on Thursday", draft_id: "draft-1" });
-      // Tomorrow 08:00 in the browser's zone (UTC in this suite), sent as an ISO UTC string.
-      expect(String(scheduled.send_at)).toMatch(/T08:00:00\.000Z$/);
-      expect(new Date(String(scheduled.send_at)).getTime()).toBeGreaterThan(Date.now());
+      // Tomorrow 08:00 in the browser's zone (UTC in this suite), sent as local wall-clock time.
+      expect(String(scheduled.send_at)).toMatch(/T08:00:00$/);
+      expect(new Date(`${String(scheduled.send_at)}Z`).getTime()).toBeGreaterThan(Date.now());
 
       await openScheduled(page, device.phone, "Scheduled, 1 message");
       const row = page.getByRole("list", { name: "Scheduled" }).getByRole("listitem");
@@ -99,7 +99,7 @@ for (const device of DEVICES) {
       await expect(row.getByText(/^Sends .*9:30/)).toBeVisible();
       const patches = api.callsTo("PATCH", "/outbox/out-1");
       expect(patches).toHaveLength(1);
-      expect(JSON.parse(patches[0]?.body ?? "{}")).toEqual({ send_at: `${value}:00.000Z` });
+      expect(JSON.parse(patches[0]?.body ?? "{}")).toEqual({ send_at: `${value}:00` });
 
       // Cancel: asks first, then the message comes back in the composer.
       await row.getByRole("button", { name: "Cancel send" }).click();
@@ -239,4 +239,17 @@ test.describe("scheduled view at 320px", () => {
     await expect(page.getByRole("list", { name: "Scheduled" }).getByRole("listitem")).toHaveCount(1);
     await expect(page.getByText("1 message")).toBeVisible();
   });
+});
+
+test("the user's time zone is stored in a cookie and their time is printed to the console on load", async ({ page, context }) => {
+  await mockApi(page);
+  const lines: string[] = [];
+  page.on("console", (message) => lines.push(message.text()));
+  await page.goto("/en/mail/inbox");
+  await expect.poll(() => lines.find((line) => line.includes("[MailFlow] User time:"))).toMatch(
+    /User time: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} \(.+, UTC[+-]\d{2}:\d{2}\)/,
+  );
+  const zone = await page.evaluate(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+  const cookie = (await context.cookies()).find((entry) => entry.name === "mf_tz");
+  expect(decodeURIComponent(cookie?.value ?? "")).toBe(zone);
 });

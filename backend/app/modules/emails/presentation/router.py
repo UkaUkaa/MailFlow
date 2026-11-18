@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, File, Form, Header, Query, Response, UploadFile, status
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.api.deps import Auth, Svc
 from app.api.schemas import (
@@ -20,6 +20,7 @@ from app.api.schemas import (
     message_out,
     thread_out,
 )
+from app.api.timezone import TimeZoneCookie, to_server_time
 from app.core.dependencies import SettingsDep
 from app.integrations.email_providers.contracts import SendMode, ThreadAction
 from app.modules.emails.application.compose import ComposeCommand, UploadedFile
@@ -75,8 +76,9 @@ class DraftRequest(BaseModel):
 class SendRequest(DraftRequest):
     draft_id: uuid.UUID | None = None
     forward_attachment_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
-    # Send later: when to send. Without it the user's undo-send window applies.
-    send_at: AwareDatetime | None = None
+    # Send later: when to send, either with a UTC offset or as local wall-clock time that is
+    # read in the time zone of the ``mf_tz`` cookie. Without it the undo-send window applies.
+    send_at: datetime | None = None
 
     def to_command(self) -> ComposeCommand:
         base = super().to_command()
@@ -193,6 +195,7 @@ async def send_email(
     payload: Annotated[str, Form(max_length=1_200_000)],
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
     files: Annotated[list[UploadFile] | None, File()] = None,
+    time_zone: TimeZoneCookie = None,
 ) -> SendResponse:
     try:
         request = SendRequest.model_validate(json.loads(payload))
@@ -225,7 +228,7 @@ async def send_email(
         request.to_command(),
         uploads,
         idempotency_key=idempotency_key,
-        send_at=request.send_at,
+        send_at=to_server_time(request.send_at, time_zone) if request.send_at else None,
     )
     if outcome.status != "sent":
         response.status_code = status.HTTP_202_ACCEPTED  # accepted, not yet sent

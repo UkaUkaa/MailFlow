@@ -48,9 +48,18 @@ function outboxSummary(item: OutboxFixture) {
 
 const YEAR_MS = 366 * 24 * 60 * 60 * 1000;
 
+/**
+ * Like the server: a time without an offset is the user's local time, read in the zone of the
+ * `mf_tz` cookie. The browsers of this suite run in UTC, so that zone is UTC here.
+ */
+function serverTime(value: unknown): Date {
+  const text = String(value);
+  return new Date(/(Z|[+-]\d{2}:\d{2})$/.test(text) ? text : `${text}Z`);
+}
+
 /** The server's `send_at` rules: in the future, at most a year ahead. */
 function sendAtProblem(value: unknown): "in_past" | "too_far" | null {
-  const time = new Date(String(value)).getTime();
+  const time = serverTime(value).getTime();
   if (Number.isNaN(time) || time <= Date.now()) return "in_past";
   return time > Date.now() + YEAR_MS ? "too_far" : null;
 }
@@ -286,7 +295,7 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
         id: `out-${++state.outboxIds}`,
         account_id: String(payload.account_id),
         status: "pending",
-        send_at: scheduled ? new Date(String(payload.send_at)).toISOString() : new Date(Date.now() + undoSeconds * 1000).toISOString(),
+        send_at: scheduled ? serverTime(payload.send_at).toISOString() : new Date(Date.now() + undoSeconds * 1000).toISOString(),
         created_at: new Date().toISOString(),
         subject: String(payload.subject ?? ""),
         to: (payload.to ?? []) as OutboxFixture["to"],
@@ -334,7 +343,7 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
         const body = request.postDataJSON() as { send_at: string };
         const problem = sendAtProblem(body.send_at);
         if (problem) return json(route, 422, { error: { code: "validation_error", message: problem, details: [{ field: "send_at", code: problem }] } });
-        Object.assign(item, { send_at: new Date(body.send_at).toISOString(), status: "pending", error_code: null });
+        Object.assign(item, { send_at: serverTime(body.send_at).toISOString(), status: "pending", error_code: null });
         return json(route, 200, outboxSummary(item));
       }
       return json(route, 200, { ...item, undo: undefined });

@@ -25,6 +25,7 @@ import type { Address } from "@/shared/types/address";
 import { createDraft, deleteDraft, sendEmail, updateDraft } from "../api";
 import { isValidEmail } from "../lib/recipients";
 import { useVisualViewportVars } from "../lib/use-visual-viewport";
+import { toServerLocalTime } from "@/shared/lib/user-time";
 import { sendErrorKey } from "../lib/send-errors";
 import type { ComposeSession, DraftRequest, SendResult } from "../types";
 import { RecipientsInput } from "./recipients-input";
@@ -269,7 +270,7 @@ export function ComposerPanel({
           ...request,
           ...(draftIdRef.current ? { draft_id: draftIdRef.current } : {}),
           ...(forwarded.length > 0 ? { forward_attachment_ids: forwarded.map((item) => item.id) } : {}),
-          ...(sendAt ? { send_at: sendAt.toISOString() } : {}),
+          ...(sendAt ? { send_at: toServerLocalTime(sendAt) } : {}),
         },
         files,
         session.key,

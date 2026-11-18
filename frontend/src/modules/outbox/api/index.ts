@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/infrastructure/api-client";
+import { toServerLocalTime } from "@/shared/lib/user-time";
 import { outboxDetailSchema, outboxItemSchema, outboxListSchema } from "../types";
 
 export const outboxKeys = {
@@ -17,7 +18,7 @@ export function fetchOutbox(signal?: AbortSignal) {
 }
 
 export function rescheduleOutboxItem(id: string, sendAt: Date) {
-  return api.patch(`/outbox/${encodeURIComponent(id)}`, outboxItemSchema, { send_at: sendAt.toISOString() });
+  return api.patch(`/outbox/${encodeURIComponent(id)}`, outboxItemSchema, { send_at: toServerLocalTime(sendAt) });
 }
 
 /** Stops a send that has not started yet and returns its full content. */

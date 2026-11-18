@@ -263,7 +263,9 @@ describe("ComposerPanel sending", () => {
     const sendAt = new Date(String(sentPayload().send_at));
     expect(sendAt.getHours()).toBe(8);
     expect(sendAt.getTime()).toBeGreaterThan(Date.now());
-    expect(String(sentPayload().send_at)).toMatch(/Z$/);
+    // Local wall-clock time; the server converts it using the time zone cookie.
+    expect(String(sentPayload().send_at)).toMatch(/T08:00:00$/);
+    expect(document.cookie).toContain("mf_tz=");
     expect(onSent.mock.calls[0]?.[0].status).toBe("scheduled");
   });
 

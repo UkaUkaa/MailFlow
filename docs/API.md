@@ -190,8 +190,12 @@ The password is never returned by any endpoint, and server settings are not echo
 `body_html` is already sanitized server-side; the client still renders it in a sandboxed iframe.
 
 `SendRequest`: `{account_id, to:[Address], cc:[Address], bcc:[Address], subject, body_html, mode:"new"|"reply"|"reply_all"|"forward", source_message_id?, draft_id?, forward_attachment_ids?:[id], send_at?}`.
-`send_at` (ISO-8601 with a UTC offset) schedules the message; it must be in the future and at most
-a year ahead (`422` with `{field:"send_at", code:"in_past"|"too_far"}`).
+`send_at` schedules the message; it must be in the future and at most a year ahead (`422` with
+`{field:"send_at", code:"in_past"|"too_far"}`). It is either ISO-8601 with a UTC offset, or the
+user's local wall-clock time without one (`2026-12-18T09:00:00`), which the server reads in the
+IANA time zone of the `mf_tz` cookie and converts to UTC. Local time without a valid cookie is a
+`422` with code `timezone_required`. The same applies to `PATCH /outbox/{id}`. Responses always
+carry UTC.
 `SendResponse`: `{status:"sent"|"undoable"|"scheduled", message_id, thread_id, outbox_id, send_at, undo_seconds}`.
 `DraftRequest`: same fields without `forward_attachment_ids`; all recipients optional.
 `Draft`: `{id, account_id, thread_id, to, cc, bcc, subject, body_html, mode, source_message_id, updated_at}`.

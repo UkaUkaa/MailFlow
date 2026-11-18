@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { Toaster } from "sonner";
 import { QueryProvider } from "@/infrastructure/api-client";
 import { ThemeProvider, useTheme } from "@/infrastructure/theme";
+import { UserTimeSync } from "@/shared/components/user-time-sync";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 
 function ThemedToaster() {
@@ -32,6 +33,7 @@ export function Providers({ children }: { children: ReactNode }) {
     <QueryProvider>
       <ThemeProvider>
         <TooltipProvider delayDuration={400} skipDelayDuration={200}>
+          <UserTimeSync />
           {children}
           <ThemedToaster />
         </TooltipProvider>

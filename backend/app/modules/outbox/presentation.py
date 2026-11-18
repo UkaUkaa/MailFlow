@@ -5,10 +5,11 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter
-from pydantic import AwareDatetime, BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict
 
 from app.api.deps import Auth, Svc
 from app.api.schemas import AddressOut, addresses_out
+from app.api.timezone import TimeZoneCookie, to_server_time
 from app.modules.outbox.domain import OutboxItem
 
 router = APIRouter(prefix="/outbox", tags=["outbox"])
@@ -50,7 +51,7 @@ class OutboxListOut(BaseModel):
 
 class RescheduleRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    send_at: AwareDatetime
+    send_at: datetime  # UTC offset, or local time in the ``mf_tz`` cookie zone
 
 
 def item_out(item: OutboxItem) -> OutboxItemOut:
@@ -99,9 +100,14 @@ async def get_outbox_item(outbox_id: uuid.UUID, auth: Auth, svc: Svc) -> OutboxD
 
 @router.patch("/{outbox_id}", response_model=OutboxItemOut)
 async def reschedule_outbox_item(
-    outbox_id: uuid.UUID, body: RescheduleRequest, auth: Auth, svc: Svc
+    outbox_id: uuid.UUID,
+    body: RescheduleRequest,
+    auth: Auth,
+    svc: Svc,
+    time_zone: TimeZoneCookie = None,
 ) -> OutboxItemOut:
-    return item_out(await svc.outbox.reschedule(auth.user_id, outbox_id, body.send_at))
+    send_at = to_server_time(body.send_at, time_zone)
+    return item_out(await svc.outbox.reschedule(auth.user_id, outbox_id, send_at))
 
 
 @router.post("/{outbox_id}/cancel", response_model=OutboxDetailOut)

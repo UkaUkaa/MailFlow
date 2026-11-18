@@ -165,7 +165,11 @@ Module `src/modules/outbox` (types, `/outbox` API hooks under the `["outbox"]` q
 - **Send later**: the chevron next to Send ("Schedule for later") opens the presets — later today
   18:00, tomorrow 08:00, Monday 08:00, or an exact date and time — computed in the browser's
   time zone by a pure function. A bottom sheet on phones, a menu (plus a dialog for the exact
-  time) from 768px. The chosen moment is sent as `send_at`.
+  time) from 768px. The chosen moment is sent as `send_at` in local
+  wall-clock time; the server converts it using the `mf_tz` cookie.
+  `src/shared/lib/user-time.ts` writes that cookie from the device's time zone, and
+  `UserTimeSync` (root providers) refreshes it on load and prints the user's time to the console
+  (`[MailFlow] User time: … (Europe/Kyiv, UTC+02:00)`).
 - **After a send** the composer closes and `useSendOutcome` (composer/hooks) takes over: `sent`
   announces it; `undoable` shows "Sending…" with a countdown bar and **Undo** for the window the
   server reports; `scheduled` shows the time with Undo for 8 s. Undo cancels the outbox item and
