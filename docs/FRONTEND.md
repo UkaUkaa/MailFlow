@@ -115,6 +115,11 @@ Layout, sizes and states: `docs/architecture/DESIGN_SYSTEM.md` and
   server does a plain full-text prefix search, so no `from:` / `has:` operators are suggested.
 - **Settings** (`modules/settings`) — `SettingsLayout` is full pages on phones and a modal dialog
   from 768px; every section stays a route.
+- **Interface preferences** (`settings/interface`) — stored with the other settings;
+  `SettingsSync` mirrors them on `<html>` (`shared/lib/interface-preferences.ts`) on every change,
+  and `interfaceInitScript` restores the last values from `localStorage` (`mf-interface`) before
+  first paint. Components react through CSS variants (see DESIGN_SYSTEM.md); the email frame,
+  which CSS cannot reach, reads the accent and text size with `useRootDataset`.
 
 ## Email rendering
 

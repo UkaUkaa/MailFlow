@@ -76,7 +76,18 @@ export const imapAccount: AccountFixture = {
   sync: { status: "idle", last_synced_at: "2026-11-17T08:50:00Z", last_error_code: null },
 };
 
-export const settings = { locale: "en", theme: "system", load_remote_images: false, conversation_view: true };
+export const settings = {
+  locale: "en",
+  theme: "system",
+  load_remote_images: false,
+  conversation_view: true,
+  list_density: "comfortable",
+  list_preview_lines: 1,
+  show_avatars: true,
+  account_tint: "subtle",
+  accent_color: "blue",
+  reader_text_size: "default",
+};
 
 const people = [
   { name: "Marta Shevchenko", email: "marta@studio-north.example" },

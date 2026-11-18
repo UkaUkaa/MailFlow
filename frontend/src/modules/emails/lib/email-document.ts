@@ -9,6 +9,8 @@ export interface EmailDocumentOptions {
   paperPadding?: number;
   /** Hide the quoted history at the end of the message (see `markQuotedHistory`). */
   collapseQuotes?: boolean;
+  /** Base text size in px (Settings → Interface); the email's own sizes still win. */
+  fontSize?: number;
 }
 
 const OWN_COLOURS = /\bbgcolor\s*=|\bbackground(?:-color)?\s*:|(?:^|[\s;"'])color\s*:|<font\b[^>]*\bcolor\s*=/i;
@@ -124,7 +126,7 @@ export function buildEmailDocument(html: string, options: EmailDocumentOptions):
 <base target="_blank">
 <style>
 html{overflow:hidden;background:transparent}
-body{margin:0;padding:${themed ? 0 : (options.paperPadding ?? 0)}px;font:15px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:${foreground};background:${themed ? "transparent" : "#ffffff"};overflow-wrap:anywhere;word-break:break-word;-webkit-text-size-adjust:100%}
+body{margin:0;padding:${themed ? 0 : (options.paperPadding ?? 0)}px;font:${options.fontSize ?? 15}px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:${foreground};background:${themed ? "transparent" : "#ffffff"};overflow-wrap:anywhere;word-break:break-word;-webkit-text-size-adjust:100%}
 img,video{max-width:100%;height:auto}
 a{color:${link}}
 pre{white-space:pre-wrap;overflow-wrap:anywhere;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}

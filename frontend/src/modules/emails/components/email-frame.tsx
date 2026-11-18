@@ -4,6 +4,8 @@ import { Ellipsis, Maximize2, Minimize2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTheme } from "@/infrastructure/theme";
+import { useRootDataset } from "@/shared/hooks/use-root-dataset";
+import { READER_FONT_SIZE, READER_TEXT_SIZES, type ReaderTextSize } from "@/shared/lib/interface-preferences";
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/cn";
 import { buildEmailDocument, emailFollowsTheme, hasQuotedHistory } from "../lib/email-document";
@@ -40,6 +42,12 @@ export function EmailFrame({
   const [quotesShown, setQuotesShown] = useState(false);
   const hasQuote = useMemo(() => hasQuotedHistory(html), [html]);
 
+  // Interface preferences: accent (link colour) and base text size. Read from <html> so the
+  // frame is rebuilt when either changes.
+  const accent = useRootDataset("accent");
+  const textSize = useRootDataset("readerText");
+  const fontSize = READER_FONT_SIZE[READER_TEXT_SIZES.includes(textSize as ReaderTextSize) ? (textSize as ReaderTextSize) : "default"];
+
   const themed = emailFollowsTheme(html);
   const srcDoc = useMemo(
     () =>
@@ -51,8 +59,11 @@ export function EmailFrame({
         borderColor: themeColor("--border-strong", "#d2d2d9"),
         paperPadding: resolvedTheme === "dark" ? 16 : 0,
         collapseQuotes: !quotesShown,
+        fontSize,
       }),
-    [html, allowRemoteImages, resolvedTheme, quotesShown],
+    // `accent` is read through `themeColor("--accent")`; it is listed so the link colour follows it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [html, allowRemoteImages, resolvedTheme, quotesShown, fontSize, accent],
   );
 
   const measure = useCallback(() => {

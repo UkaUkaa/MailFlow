@@ -26,15 +26,15 @@ function ListSkeleton() {
   return (
     <ul aria-hidden>
       {Array.from({ length: 8 }, (_, index) => (
-        <li key={index} className="flex min-h-[88px] items-start gap-1 py-3 pr-5 pl-[30px]">
-          <Skeleton className="mt-0.5 size-7 shrink-0 rounded-full" />
+        <li key={index} className="flex min-h-[88px] items-start gap-1 py-3 pr-5 pl-[30px] preview-none:min-h-[76px] compact:min-h-[60px] compact:py-2">
+          <Skeleton className="mt-0.5 size-7 shrink-0 rounded-full no-avatars:hidden" />
           <div className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
             <div className="flex items-center gap-3">
               <Skeleton className="h-3.5 w-32" />
               <Skeleton className="ml-auto h-3 w-10" />
             </div>
             <Skeleton className="h-3 w-3/4" />
-            <Skeleton className="h-3 w-1/2" />
+            <Skeleton className="h-3 w-1/2 preview-none:hidden" />
           </div>
         </li>
       ))}

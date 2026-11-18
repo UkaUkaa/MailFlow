@@ -71,7 +71,7 @@ Password policy: 10–128 characters.
 | GET | `/settings` | — | `Settings` |
 | PATCH | `/settings` | partial `Settings` | `Settings` |
 
-`Settings`: `{locale:"en"|"uk", theme:"system"|"light"|"dark", load_remote_images:boolean, conversation_view:boolean}`.
+`Settings`: `{locale:"en"|"uk", theme:"system"|"light"|"dark", load_remote_images:boolean, conversation_view:boolean, list_density:"comfortable"|"compact", list_preview_lines:0|1|2, show_avatars:boolean, account_tint:"off"|"subtle"|"strong", accent_color:"blue"|"violet"|"green"|"orange"|"pink"|"graphite", reader_text_size:"small"|"default"|"large"}`. Any other value is a 422.
 
 ## Accounts — `/accounts`
 

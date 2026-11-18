@@ -247,11 +247,45 @@ async def test_profile_and_settings(alice):
         "theme": "system",
         "load_remote_images": False,
         "conversation_view": True,
+        "list_density": "comfortable",
+        "list_preview_lines": 1,
+        "show_avatars": True,
+        "account_tint": "subtle",
+        "accent_color": "blue",
+        "reader_text_size": "default",
     }
     updated = await alice.client.patch("/api/v1/settings", json={"locale": "uk", "theme": "dark"})
     assert updated.json()["locale"] == "uk" and updated.json()["theme"] == "dark"
     bad = await alice.client.patch("/api/v1/settings", json={"locale": "de"})
     assert bad.status_code == 422
+
+
+async def test_interface_preferences(alice):
+    interface = {
+        "list_density": "compact",
+        "list_preview_lines": 2,
+        "show_avatars": False,
+        "account_tint": "strong",
+        "accent_color": "green",
+        "reader_text_size": "large",
+    }
+    updated = await alice.client.patch("/api/v1/settings", json=interface)
+    assert updated.status_code == 200
+    stored = (await alice.client.get("/api/v1/settings")).json()
+    assert {key: stored[key] for key in interface} == interface
+    # Earlier choices are kept when only one field changes.
+    await alice.client.patch("/api/v1/settings", json={"accent_color": "pink"})
+    stored = (await alice.client.get("/api/v1/settings")).json()
+    assert stored["accent_color"] == "pink" and stored["list_density"] == "compact"
+    for bad in (
+        {"list_density": "tiny"},
+        {"list_preview_lines": 5},
+        {"account_tint": "loud"},
+        {"accent_color": "#ff0000"},
+        {"reader_text_size": "huge"},
+    ):
+        response = await alice.client.patch("/api/v1/settings", json=bad)
+        assert response.status_code == 422, bad
 
 
 async def test_unauthenticated_requests_are_rejected(client):

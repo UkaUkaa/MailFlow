@@ -81,6 +81,17 @@ themes (unit-tested). Avatar discs use the same hues 15% darker
 (`AVATAR_COLORS`), picked deterministically from the sender's address; white initials reach at
 least 5.1:1 on every one (unit-tested). No avatar picture is ever fetched.
 
+Interface preferences (Settings → Interface) restyle the app through `<html>` data attributes
+set by `shared/lib/interface-preferences.ts`:
+- `data-accent` swaps `--accent`, `--accent-hover` and `--accent-soft` for one of six palettes
+  per theme (blue is the default). Every palette keeps `--accent-foreground` on the accent and the
+  accent on `--accent-soft`, `--surface` and `--background` at 4.5:1 or more (unit-tested against
+  `globals.css`). An element can carry `data-accent` itself (the swatches do).
+- `data-tint` = `off` removes the row wash; `strong` raises it to 10% / 14% (light) and 13% / 15%
+  (dark), the most the muted-text contrast rule above allows.
+- `data-density`, `data-preview`, `data-avatars` drive the Tailwind variants `compact:`,
+  `preview-none:`, `preview-two:` and `no-avatars:` used by the thread row and its skeleton.
+
 ## Typography
 
 Font: Inter (variable, self-hosted via `next/font`) with system fallbacks; it covers Cyrillic.

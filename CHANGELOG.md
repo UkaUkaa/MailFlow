@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- Settings → Interface: message-list density (comfortable / compact), preview lines (off / 1 / 2),
+  sender pictures on/off, mailbox colour wash (off / subtle / strong), app accent colour (blue,
+  violet, green, orange, pink, graphite) and the reader's base text size, with a live preview
+  and "Reset to defaults". Stored on the account (`/settings`, migration `0003`) and applied
+  through `<html>` data attributes, cached locally so a reload does not flash the default layout.
 - Account appearance: any RGB colour per mailbox (presets, the platform colour picker or a hex
   code) and an optional picture (PNG/JPEG/WebP, cropped and re-encoded to 96×96 in the browser;
   its average colour is suggested). `PUT`/`DELETE`/`GET /accounts/{id}/avatar`,

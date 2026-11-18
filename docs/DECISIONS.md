@@ -231,3 +231,17 @@ is tinted with the mailbox colour.
 - **The wash is a small share of the colour mixed into the surface** (OKLab `color-mix`), not
   an opacity overlay, so text keeps its colour and contrast is predictable; the shares are theme
   tokens. The selected row keeps the accent fill so the open conversation stays obvious.
+
+## D37 — Interface preferences on the account, applied as `<html>` attributes
+Settings → Interface lets users choose list density, preview lines, sender pictures, wash
+strength, an accent colour and the reader's text size.
+- **Stored server-side with the other settings**, not only in the browser, so they follow the
+  user to every device. They are also cached in `localStorage` (nothing sensitive) only to avoid
+  a flash of the default layout on reload, the same way the theme is.
+- **Applied as data attributes and CSS variants**, not React props: the thread row, its skeleton
+  and the preview in settings share one set of classes, and nothing between the settings query
+  and the row needs to know about them.
+- **Fixed choices, not free values.** Accents are six reviewed palettes rather than any colour,
+  so contrast can be guaranteed and tested; free-form colour stays with mailboxes (D36).
+- **Reader text size sets only the base size.** Most HTML email sets its own sizes and is shown
+  as authored; scaling it would fight the fit-to-width logic of the email frame.

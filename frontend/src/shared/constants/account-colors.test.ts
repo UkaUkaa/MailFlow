@@ -51,12 +51,15 @@ function contrast(a: string, b: string): number {
   return (light + 0.05) / (dark + 0.05);
 }
 
-describe("row tint (globals.css --account-tint-hover)", () => {
+describe("row tint (globals.css --account-tint-hover, subtle and strong)", () => {
   // Presets plus the extremes a user can pick from the RGB picker.
   const colors = [...ACCOUNT_COLORS, "#ffffff", "#000000", "#ffff00", "#ff0000", "#00ffff"];
   const themes = [
     { name: "light", surface: "#ffffff", muted: "#5d5f6b", hoverShare: 0.12 },
     { name: "dark", surface: "#202227", muted: "#adb0ba", hoverShare: 0.14 },
+    // Settings → Interface → "Strong" ([data-tint="strong"]).
+    { name: "light strong", surface: "#ffffff", muted: "#5d5f6b", hoverShare: 0.14 },
+    { name: "dark strong", surface: "#202227", muted: "#adb0ba", hoverShare: 0.15 },
   ];
 
   it("keeps muted text readable on the strongest wash in both themes (WCAG AA)", () => {

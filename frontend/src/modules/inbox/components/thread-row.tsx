@@ -38,7 +38,7 @@ function QuickAction({ label, onClick, children }: { label: string; onClick: () 
       title={label}
       aria-label={label}
       onClick={onClick}
-      className="inline-flex h-6 w-8 items-center justify-center rounded-sm text-foreground-muted hover:bg-border hover:text-foreground [&_svg]:size-3.5"
+      className="inline-flex h-6 w-8 items-center justify-center rounded-sm compact:h-5 no-avatars:w-7 text-foreground-muted hover:bg-border hover:text-foreground [&_svg]:size-3.5"
     >
       {children}
     </button>
@@ -58,8 +58,10 @@ function isKeyboardFocus(target: Element): boolean {
 }
 
 /**
- * Three-line conversation row: unread dot and avatar in the gutter, then sender / date,
- * subject + count + attachment, and one preview line.
+ * Conversation row: unread dot and avatar in the gutter, then sender / date, subject + count +
+ * attachment, and the preview. Settings → Interface reshapes it through CSS variants on
+ * `<html>` (`compact:`, `preview-none:`, `preview-two:`, `no-avatars:`; globals.css): the
+ * default is three lines with one line of preview.
  */
 export const ThreadRow = memo(function ThreadRow({
   thread,
@@ -103,7 +105,7 @@ export const ThreadRow = memo(function ThreadRow({
       <Link
         href={href}
         aria-current={selected ? "true" : undefined}
-        className="flex min-h-[88px] min-w-0 py-3 pr-5 -outline-offset-2"
+        className="flex min-h-[88px] min-w-0 py-3 pr-5 -outline-offset-2 preview-none:min-h-[76px] compact:min-h-[60px] compact:py-2 compact:preview-none:min-h-[60px]"
       >
         <span className={cn("flex shrink-0", CONCEAL_ON_HOVER, keyboardFocus && "invisible")}>
           <span className="flex w-[30px] shrink-0 justify-center pt-[11px]">
@@ -114,11 +116,11 @@ export const ThreadRow = memo(function ThreadRow({
             ) : null}
           </span>
           {isDraft ? (
-            <span aria-hidden className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-border-strong text-foreground-muted">
+            <span aria-hidden className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-border-strong text-foreground-muted no-avatars:hidden">
               <Pencil className="size-3.5" />
             </span>
           ) : (
-            <Avatar name={first ? addressLabel(first) : ""} colorKey={first?.email ?? ""} className="mt-0.5" />
+            <Avatar name={first ? addressLabel(first) : ""} colorKey={first?.email ?? ""} className="mt-0.5 no-avatars:hidden" />
           )}
         </span>
         <span className="ml-1 flex min-w-0 flex-1 flex-col gap-0.5">
@@ -133,7 +135,7 @@ export const ThreadRow = memo(function ThreadRow({
               {formatListDate(thread.last_message_at, locale)}
             </time>
           </span>
-          <span className="flex min-w-0 items-center gap-1.5 touch:pr-8">
+          <span className="flex min-w-0 items-center gap-1.5 touch:pr-8 preview-none:pr-7">
             <span className={cn("min-w-0 flex-1 truncate text-[13px] font-medium text-foreground", !thread.subject && "italic")}>
               {thread.subject || t("noSubject")}
             </span>
@@ -146,12 +148,23 @@ export const ThreadRow = memo(function ThreadRow({
             {thread.has_attachments ? (
               <Paperclip className="size-3.5 shrink-0 text-foreground-muted" aria-label={t("hasAttachments")} />
             ) : null}
+            {/* Without the preview line the mailbox marker moves up to the subject. */}
+            {showAccount ? (
+              <span className="hidden shrink-0 preview-none:inline-flex">
+                <AccountDot color={accountColor} imageUrl={accountImageUrl} />
+              </span>
+            ) : null}
           </span>
-          <span className="flex min-w-0 items-center gap-2 pr-7 touch:pr-8">
-            <span className={cn("min-w-0 flex-1 truncate text-[13px] text-foreground-muted", !thread.snippet && "italic")}>
+          <span className="flex min-w-0 items-center gap-2 pr-7 touch:pr-8 preview-none:hidden preview-two:items-start">
+            <span
+              className={cn(
+                "min-w-0 flex-1 truncate text-[13px] text-foreground-muted preview-two:line-clamp-2 preview-two:whitespace-normal",
+                !thread.snippet && "italic",
+              )}
+            >
               {thread.snippet || t("noContent")}
             </span>
-            {showAccount ? <AccountDot color={accountColor} imageUrl={accountImageUrl} /> : null}
+            {showAccount ? <AccountDot color={accountColor} imageUrl={accountImageUrl} className="preview-two:mt-1.5" imageClassName="preview-two:mt-0.5" /> : null}
           </span>
         </span>
       </Link>
@@ -173,7 +186,7 @@ export const ThreadRow = memo(function ThreadRow({
       */}
       <div
         className={cn(
-          "absolute inset-y-0 left-0 hidden w-[58px] flex-col items-center justify-center gap-0.5",
+          "absolute inset-y-0 left-0 hidden w-[58px] flex-col items-center justify-center gap-0.5 compact:gap-0 no-avatars:w-[34px]",
           REVEAL_ON_HOVER,
           keyboardFocus && "flex",
         )}

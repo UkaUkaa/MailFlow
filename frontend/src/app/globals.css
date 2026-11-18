@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* Interface preferences (Settings → Interface), mirrored on <html> (interface-preferences.ts). */
+@custom-variant compact (&:where([data-density="compact"] *));
+@custom-variant preview-none (&:where([data-preview="0"] *));
+@custom-variant preview-two (&:where([data-preview="2"] *));
+@custom-variant no-avatars (&:where([data-avatars="off"] *));
 /* Finger-sized controls: coarse pointers and all phone widths. */
 @custom-variant touch {
   @media (pointer: coarse) {
@@ -94,6 +99,92 @@
   /* Dark surfaces need a little more of the colour for the same perceived wash. */
   --account-tint-rest: 10%;
   --account-tint-hover: 14%;
+}
+
+/*
+ * Accent palettes (Settings → Interface → Accent colour). Blue repeats the defaults above so that
+ * an element of its own (a swatch) can show any palette inside a page with another accent. Each
+ * keeps accent-foreground on accent and accent on accent-soft at WCAG AA in both themes
+ * (interface-preferences.test.ts).
+ */
+[data-accent="blue"] {
+  --accent: #3355e0;
+  --accent-hover: #2947c7;
+  --accent-soft: #e6ebfd;
+}
+[data-accent="violet"] {
+  --accent: #6d3fd6;
+  --accent-hover: #5c31bf;
+  --accent-soft: #efe9fc;
+}
+[data-accent="green"] {
+  --accent: #1d7348;
+  --accent-hover: #17603c;
+  --accent-soft: #e2f3e9;
+}
+[data-accent="orange"] {
+  --accent: #b0470b;
+  --accent-hover: #963c09;
+  --accent-soft: #fcebdf;
+}
+[data-accent="pink"] {
+  --accent: #c02a69;
+  --accent-hover: #a5235a;
+  --accent-soft: #fbe6ef;
+}
+[data-accent="graphite"] {
+  --accent: #3f4250;
+  --accent-hover: #2f313c;
+  --accent-soft: #e8e9ee;
+}
+[data-accent="blue"][data-theme="dark"],
+[data-theme="dark"] [data-accent="blue"] {
+  --accent: #8098ff;
+  --accent-hover: #96aaff;
+  --accent-soft: #27315e;
+}
+[data-accent="violet"][data-theme="dark"],
+[data-theme="dark"] [data-accent="violet"] {
+  --accent: #b195ff;
+  --accent-hover: #c2abff;
+  --accent-soft: #34295a;
+}
+[data-accent="green"][data-theme="dark"],
+[data-theme="dark"] [data-accent="green"] {
+  --accent: #5fcf96;
+  --accent-hover: #7adba8;
+  --accent-soft: #1d3a2c;
+}
+[data-accent="orange"][data-theme="dark"],
+[data-theme="dark"] [data-accent="orange"] {
+  --accent: #ff9a5c;
+  --accent-hover: #ffad7a;
+  --accent-soft: #42291a;
+}
+[data-accent="pink"][data-theme="dark"],
+[data-theme="dark"] [data-accent="pink"] {
+  --accent: #ff85b5;
+  --accent-hover: #ff9fc5;
+  --accent-soft: #432232;
+}
+[data-accent="graphite"][data-theme="dark"],
+[data-theme="dark"] [data-accent="graphite"] {
+  --accent: #c4c6d0;
+  --accent-hover: #d6d8e0;
+  --accent-soft: #383a43;
+}
+
+/*
+ * Mailbox colour wash strength (Settings → Interface). "subtle" is the default above. The hover
+ * share is capped by muted-text contrast on the most extreme colours (account-colors.test.ts).
+ */
+[data-tint="strong"] {
+  --account-tint-rest: 10%;
+  --account-tint-hover: 14%;
+}
+[data-tint="strong"][data-theme="dark"] {
+  --account-tint-rest: 13%;
+  --account-tint-hover: 15%;
 }
 
 @theme inline {
@@ -303,6 +394,16 @@
   @media (hover: hover) {
     .account-tint:hover {
       background-color: color-mix(in oklab, var(--account-tint) var(--account-tint-hover), var(--surface));
+    }
+  }
+  /* Tint switched off: rows look like untinted ones. */
+  [data-tint="off"] .account-tint {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  @media (hover: hover) {
+    [data-tint="off"] .account-tint:hover {
+      background-color: color-mix(in oklab, var(--muted) 60%, transparent);
     }
   }
 }

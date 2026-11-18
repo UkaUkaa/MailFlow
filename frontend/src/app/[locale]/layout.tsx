@@ -7,6 +7,7 @@ import type { ReactNode } from "react";
 import { routing } from "@/infrastructure/i18n/routing";
 import { themeInitScript } from "@/infrastructure/theme";
 import { navInitScript } from "@/shared/components/layout/nav-state";
+import { interfaceInitScript } from "@/shared/lib/interface-preferences";
 import { Providers } from "./providers";
 import "../globals.css";
 
@@ -54,6 +55,7 @@ export default async function LocaleLayout({ children, params }: { children: Rea
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} suppressHydrationWarning />
         {/* A second tag, not a concatenation: `themeInitScript` comes from a client module and must be passed through as it is. */}
         <script dangerouslySetInnerHTML={{ __html: navInitScript }} suppressHydrationWarning />
+        <script dangerouslySetInnerHTML={{ __html: interfaceInitScript }} suppressHydrationWarning />
         <NextIntlClientProvider>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>

@@ -458,6 +458,7 @@
       "profile": "Profile",
       "accounts": "Connected accounts",
       "appearance": "Appearance and language",
+      "interface": "Interface",
       "security": "Password",
       "sessions": "Sessions",
       "danger": "Delete account"
@@ -484,6 +485,64 @@
       "languageDescription": "Used for the interface and for emails MailFlow sends you.",
       "remoteImages": "Always show remote images",
       "remoteImagesDescription": "Off by default: remote images can tell senders when you open their email."
+    },
+    "interface": {
+      "title": "Interface",
+      "description": "Arrange the message list and the reader the way you like.",
+      "preview": {
+        "label": "Preview",
+        "sender1": "Olena Kovalenko",
+        "subject1": "Design review on Thursday",
+        "snippet1": "Here are the mockups for the new onboarding flow. Could you take a look before the meeting and leave your comments?",
+        "sender2": "Team updates",
+        "subject2": "Weekly summary",
+        "snippet2": "Three tasks were closed this week and two new ones are waiting for review.",
+        "time2": "Yesterday"
+      },
+      "listSection": "Message list",
+      "density": "Density",
+      "densityDescription": "Compact fits more conversations on the screen.",
+      "densities": {
+        "comfortable": "Comfortable",
+        "compact": "Compact"
+      },
+      "previewLines": "Message preview",
+      "previewLinesDescription": "How much of the latest message is shown under the subject.",
+      "previewOptions": {
+        "0": "Off",
+        "1": "1 line",
+        "2": "2 lines"
+      },
+      "avatars": "Sender pictures",
+      "avatarsDescription": "Show a coloured initial for each sender in the list.",
+      "tint": "Mailbox colour in rows",
+      "tintDescription": "How strongly each row is washed with its mailbox colour.",
+      "tints": {
+        "off": "Off",
+        "subtle": "Subtle",
+        "strong": "Strong"
+      },
+      "colorsSection": "Colours",
+      "accent": "Accent colour",
+      "accentDescription": "Used for buttons, links, selection and unread markers.",
+      "accents": {
+        "blue": "Blue",
+        "violet": "Violet",
+        "green": "Green",
+        "orange": "Orange",
+        "pink": "Pink",
+        "graphite": "Graphite"
+      },
+      "readerSection": "Reader",
+      "readerText": "Message text size",
+      "readerTextDescription": "Applies to messages that do not set their own text size.",
+      "readerTexts": {
+        "small": "Small",
+        "default": "Default",
+        "large": "Large"
+      },
+      "reset": "Reset to defaults",
+      "resetDone": "Interface settings reset"
     },
     "security": {
       "title": "Password",
