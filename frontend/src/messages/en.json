@@ -48,8 +48,8 @@
     "switchTheme": "Switch theme to {theme}",
     "pinSidebar": "Expand menu",
     "unpinSidebar": "Collapse menu",
-    "more": "Accounts and folders",
-    "accounts": "Accounts"
+    "languageRow": "Language: {language}",
+    "themeRow": "Theme: {theme}"
   },
   "accounts": {
     "title": "Connected accounts",

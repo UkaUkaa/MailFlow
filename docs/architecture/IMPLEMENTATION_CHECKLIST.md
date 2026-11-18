@@ -40,7 +40,7 @@ Update this file whenever an item changes state.
 - [x] Auth screens, app shell (phone / tablet / desktop / ultrawide), inbox, reader, composer, settings
 - [x] Light and dark themes, English and Ukrainian with equal coverage
 - [x] Playwright viewport matrix (15 sizes + landscape, both locales) with screenshot review
-- [x] Layout reworked after `docs/design/SPARK_REFERENCE.md`: rail + flyout, date-grouped list,
+- [x] Layout reworked after `docs/design/SPARK_REFERENCE.md`: rail that expands in place, date-grouped list,
       message cards, page / docked composer, search mode, settings dialog (Chromium only)
 - [~] Mail screens are verified with mocked API data; against the real backend only the
       no-mailbox states were exercised (no Google credentials available)
@@ -54,7 +54,7 @@ Update this file whenever an item changes state.
 
 ## Phase 8 — Testing and security review
 - [x] Backend: unit, integration, security, architecture suites; Ruff; MyPy strict
-- [x] Frontend: ESLint, TypeScript, Vitest (199), Playwright (136, incl. hydration regression)
+- [x] Frontend: ESLint, TypeScript, Vitest (204), Playwright (142, incl. hydration regression)
 - [~] Security review: internal checklist applied; no external assessment
 
 ## Phase 9 — Finalization

@@ -118,14 +118,18 @@ Honest list of what is missing or partial. Update whenever something here change
   classes).
 - Search suggestions offer no operators (`from:`, `has:` …): the search API has none.
 - Avatars are initials on a colour; no pictures (Gravatar, provider photos) are loaded.
-- The flyout is modal: while it is open the rail behind it does not react until it is closed.
+- Navigation: the language and theme rows show "Language: English" / "Theme: System" while their
+  accessible names are "Switch language to …" / "Switch theme to …" (WCAG 2.5.3 is not met
+  literally). When the column is collapsed and the window is short, the views and accounts
+  scroll without a visible scrollbar. A mailbox's own folders are reachable only with the menu
+  expanded (or in the phone drawer). The width animation needs `@property` (Chromium, Safari
+  16.4+, Firefox 128+); elsewhere the column switches instantly.
 - Behind the settings dialog the list of the last mail view is shown without the open
   conversation.
 - The date headings do not update at midnight until the list re-renders.
 - The light theme has no reference observation; it was derived from the dark roles.
 - Not visually verified on real devices or in Safari / Firefox: the new layout was reviewed in
-  Chromium screenshots only. The draft card and the pinned sidebar are covered by tests but have
-  no fixture-driven screenshot in the viewport matrix (pinned: one desktop screenshot).
+  Chromium screenshots only. The draft card is covered by unit tests but has no screenshot.
 
 ## Accounts
 

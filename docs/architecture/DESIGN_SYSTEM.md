@@ -15,9 +15,9 @@ Panes are separated by tone, not by divider lines.
 
 | Step | Token | Where |
 |---|---|---|
-| Deepest | `--rail` | Navigation rail |
+| Deepest | `--rail` | Navigation column, collapsed and expanded |
 | Base | `--background` | Reading pane, composer page, settings navigation column, auth pages |
-| Raised | `--surface` | List pane, flyout / pinned sidebar, phone drawer |
+| Raised | `--surface` | List pane, phone drawer |
 | Raised (floating) | `--surface-raised` | Message cards, dialogs, sheets, docked reply, menus, inputs |
 
 In the dark theme each step is lighter than the previous one. In the light theme the roles are
@@ -28,7 +28,7 @@ the reading pane a faint grey, the list pane and cards white.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--rail` | `#e9e9ee` | `#0a0b0d` | Navigation rail |
+| `--rail` | `#e9e9ee` | `#0a0b0d` | Navigation column |
 | `--background` | `#f5f5f7` | `#17181c` | App canvas, reading pane, composer |
 | `--surface` | `#ffffff` | `#202227` | List pane, sidebar, drawer |
 | `--surface-raised` | `#ffffff` | `#24262c` | Cards, dialogs, sheets, docked reply |
@@ -64,6 +64,8 @@ Rules that follow from the numbers:
   `--accent-soft` and `--muted` it drops to 4.3–4.6:1, so text on a selected row or a chip uses
   `--foreground-muted` (the list row switches its date colour when selected).
 - The empty-pane glyph and the rail's hover fill are decoration and are exempt.
+- Text on `--rail` (row labels, section headings) uses `--foreground-muted` or stronger;
+  `--foreground-subtle` would be 4.4:1 there in the light theme.
 
 Account colours (identification dots): a fixed set of eight hues, chosen per account
 (`shared/constants/account-colors.ts`). Avatar discs use the same hues 15% darker
@@ -95,15 +97,14 @@ Monospace: `ui-monospace` stack. Weights in the mail workspace: regular, medium 
 - Radius: `--radius-sm` 6px (chips, navigation rows, search field, square buttons), 7px (rail
   buttons), `--radius-md` 8px (inputs, buttons), `--radius-lg` 12px (message cards, dialogs,
   docked reply, settings dialog), `--radius-xl` 16px (sheets), full (toolbar pill, avatars).
-- Shadow: `--shadow-sm` for popovers, `--shadow-lg` for dialogs, the flyout and the docked reply.
+- Shadow: `--shadow-sm` for popovers, `--shadow-lg` for dialogs and the docked reply.
   Nothing else is shadowed.
 
 ## Component sizes
 
 | Component | Desktop | Coarse pointer / phone |
 |---|---|---|
-| Navigation rail | 70px wide; buttons 28×28, 20px glyph, 31px pitch | buttons 44×44 |
-| Flyout / pinned sidebar | 240px; rows 31px | rows 44px |
+| Navigation column | 70px collapsed, 240px expanded; rows 28px high at 31px pitch with 21px side margins; icon cell 28×28 with a 20px glyph, centred at x = 35 in both states; label 14px after the cell | rows and icon cells 44px, 13px side margins (centre still at 35) |
 | List pane | 348px (400 from 1920); header 76px | full width; header 56px |
 | Thread row | 88px, three lines; gutter 30, avatar 28, text from 62 | same; star target 44 |
 | Date-group label | 13px, 24px above / 12px below | same |
@@ -124,18 +125,20 @@ The coarse-pointer sizes are applied with `@media (pointer: coarse)` through the
 
 - Hover: one tonal step (`--muted`), no border change. Thread rows also swap the unread dot and
   avatar for the quick-action column.
-- Active / selected: solid `--accent` for the open view (rail square, sidebar pill); `--accent-soft`
+- Active / selected: solid `--accent` for the open view (the row: a 28px square when collapsed, a pill when expanded); `--accent-soft`
   for rows (selected thread, active settings row, active account).
 - Focus: 2px `--accent` ring with 2px offset, `:focus-visible` only; the search field shows a 2px
   accent border instead.
 - Disabled: 50% opacity, `not-allowed` cursor, no hover.
 - Loading: skeletons matching final layout (no layout shift); buttons show a spinner and keep width.
 - Error: `--danger` text + icon, never colour alone. Success: toast with `--success` icon.
-- Motion: 120–200ms ease-out (flyout and docked reply 140–150ms); respects `prefers-reduced-motion`.
+- Motion: 120–200ms ease-out (docked reply 140ms; navigation column width 180ms with labels fading over 150ms); respects `prefers-reduced-motion`.
 
 ## Tooltips
 
 Every icon-only control has an accessible name and a tooltip with the same text (`Tooltip`).
+Where a control's label can become visible (the navigation column when expanded) the tooltip is
+switched off with `disabled`, which keeps the element tree and therefore the focus.
 A key chip (`shortcut` prop) is shown only for shortcuts that exist: Esc (close composer, close
 settings) and Ctrl/⌘ Enter (send). There is no global shortcut layer, so navigation icons carry
 no key hints.

@@ -84,11 +84,16 @@
 - Removed strings `nav.toggleSidebar`, `composer.minimize`, `composer.ccBcc`,
   `mail.searchPrompt*`; the floating, minimizable composer is gone.
 
+- Navigation is one layout: the collapsed rail and the expanded menu are the same rows (fixed
+  icon cell + label), so expanding only widens the column (animated, 180ms) and reveals labels
+  and unread counts; no icon, the toggle included, changes position. Accounts are rows of the
+  column in both states; language and theme are the same two rows ("Language: …", "Theme: …");
+  the stored state is applied before first paint. The overlay flyout, the accent Compose button
+  and the segmented switches in the menu are removed; the phone drawer uses the same rows.
 - Navigation: an "Expand menu" button on the rail and "Collapse menu" in the menu header;
   language and theme switches in the rail (compact) and in the full menu and phone drawer.
 
 ### Fixed
-- Escape now closes the navigation flyout even while a tooltip of a focused button is open.
 - Escape did not close the composer while the caret was in the message body.
 - Closing the phone drawer did not return focus to the menu button.
 - Search by email address returned nothing (tsquery tokenisation).

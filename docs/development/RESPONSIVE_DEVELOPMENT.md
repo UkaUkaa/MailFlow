@@ -32,7 +32,9 @@ Read `docs/architecture/RESPONSIVE_ARCHITECTURE.md` first. This page is the work
   While focus moves between two controls nothing is focused, the rule hides the target and the
   browser drops the focus. Track focus in state (`ThreadRow`) or hide with opacity.
 - Position anything that sits beside the navigation with `var(--nav-offset)`, never a fixed 70px:
-  the sidebar can be pinned open (240px).
+  the navigation can be expanded (240px), and the variable animates.
+- Navigation items are rows built from `nav-row.ts` (icon cell + label). Do not add a control
+  that exists in only one state above or between shared rows: it would move them.
 - A Radix dialog opened without a `Dialog.Trigger` does not return focus by itself: handle
   `onCloseAutoFocus` (see `AppShell`).
 - Dialogs: `ResponsiveDialog` (bottom sheet on phones). Menus: `ResponsiveMenu`.
@@ -45,7 +47,7 @@ Read `docs/architecture/RESPONSIVE_ARCHITECTURE.md` first. This page is the work
 
 ## Automated checks
 
-`frontend/e2e/responsive.spec.ts` walks login → inbox → navigation (drawer / rail + flyout) →
+`frontend/e2e/responsive.spec.ts` walks login → inbox → navigation (drawer / rail expanded in place) →
 reader → reply → composer → search → search results → connected accounts → action menu at:
 
 - 320×568, 360×800, 375×812, 390×844, 414×896, 430×932, 600×900, 768×1024, 820×1180, 1024×768,
@@ -58,8 +60,8 @@ reader → reply → composer → search → search results → connected accoun
 Assertions: `scrollWidth <= clientWidth` for the document and body, primary actions inside the
 viewport, no overlap between row timestamp and star, rows not wrapping into tall blocks, 44px
 touch targets on phones, list not hidden behind the bottom navigation, 88px three-line rows with
-a 28px avatar and a date heading, 70px rail and a 240px flyout that starts after it and returns
-focus on Escape, message cards (12px radius, 12px inset), collapsed quote toggle, reader column
+a 28px avatar and a date heading, 70px rail that expands to 240px without moving its toggle or its settings row and keeps
+focus on the toggle, message cards (12px radius, 12px inset), collapsed quote toggle, reader column
 ≤ 768px, email content scaled to its frame, reply docked at 520×≤380 from 1024px and filling the
 workspace below, composer full screen on phones / beside the rail from 768px with a 22px subject
 and still showing Send and the toolbar when the viewport height shrinks (keyboard stand-in),
@@ -69,7 +71,8 @@ subject, an unbreakable 80-character token, Ukrainian content and a 900px-wide H
 
 `frontend/e2e/mobile.spec.ts` covers the touch flows (bottom navigation, drawer, single-pane
 reader, bottom-sheet menus, composer). `frontend/e2e/layout.spec.ts` covers the desktop
-behaviours: tonal surfaces, rail states and tooltips, flyout keyboard operation, pinning, date
+behaviours: tonal surfaces, rail states and tooltips, the collapsed ↔ expanded navigation (every icon keeps its position,
+labels and counts, animation, reduced motion, no flash on reload, keyboard), date
 groups per locale and time zone, row quick actions by pointer and keyboard, the reader pill and
 quote toggle, the docked reply, and the settings dialog (deep links, focus containment, nested
 dialogs, phone pages).

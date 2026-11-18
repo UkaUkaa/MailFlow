@@ -6,6 +6,7 @@ import { getTranslations, setRequestLocale } from "next-intl/server";
 import type { ReactNode } from "react";
 import { routing } from "@/infrastructure/i18n/routing";
 import { themeInitScript } from "@/infrastructure/theme";
+import { navInitScript } from "@/shared/components/layout/nav-state";
 import { Providers } from "./providers";
 import "../globals.css";
 
@@ -45,12 +46,14 @@ export default async function LocaleLayout({ children, params }: { children: Rea
     <html lang={locale} className={inter.variable} suppressHydrationWarning>
       <body>
         {/*
-          Applies the stored theme before first paint. It must be the first node of <body>, not a
+          Applies the stored theme and navigation width before first paint. It must be the first node of <body>, not a
           child of <head>: React and Next manage <head> themselves (hoisted metadata, stylesheets,
           preloads), and an extra element there fails hydration whenever the HTML arrives in one
           piece, e.g. behind a buffering reverse proxy.
         */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} suppressHydrationWarning />
+        {/* A second tag, not a concatenation: `themeInitScript` comes from a client module and must be passed through as it is. */}
+        <script dangerouslySetInnerHTML={{ __html: navInitScript }} suppressHydrationWarning />
         <NextIntlClientProvider>
           <Providers>{children}</Providers>
         </NextIntlClientProvider>

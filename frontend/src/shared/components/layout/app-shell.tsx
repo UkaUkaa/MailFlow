@@ -1,21 +1,18 @@
 "use client";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { createContext, useCallback, useContext, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { SheetContent } from "@/shared/components/ui/dialog";
+import { NAV_STORAGE_KEY } from "./nav-state";
 
-/** Stored preference: `"false"` = the sidebar is pinned open; anything else = icon rail. */
-export type SidebarMode = "auto" | "true" | "false";
-export type SidebarVariant = "pinned" | "flyout" | "drawer";
-const STORAGE_KEY = "mf-sidebar";
+export type NavigationVariant = "aside" | "drawer";
 const listeners = new Set<() => void>();
 
-function readMode(): SidebarMode {
+function readExpanded(): boolean {
   try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored === "true" || stored === "false" ? stored : "auto";
+    return window.localStorage.getItem(NAV_STORAGE_KEY) === "false";
   } catch {
-    return "auto";
+    return false;
   }
 }
 
@@ -24,17 +21,19 @@ function subscribe(listener: () => void): () => void {
   return () => listeners.delete(listener);
 }
 
+/** `<html data-nav>` is what the style sheet sizes the column from (see `globals.css`). */
+function reflect(expanded: boolean): void {
+  document.documentElement.dataset.nav = expanded ? "expanded" : "collapsed";
+}
+
 interface ShellContextValue {
   /** Phone drawer. */
   drawerOpen: boolean;
   openDrawer: () => void;
   closeDrawer: () => void;
-  /** Flyout sidebar next to the rail (tablet and wider). */
-  flyoutOpen: boolean;
-  openFlyout: () => void;
-  /** Closes whichever temporary navigation surface is open. */
+  /** Closes the temporary navigation surface (the phone drawer) after a destination is chosen. */
   closeNavigation: () => void;
-  /** The user keeps the full sidebar open instead of the rail. */
+  /** The navigation column is expanded (labels visible) instead of the icon rail. */
   pinned: boolean;
   togglePinned: () => void;
   /** Takes the navigation out of the tab order while a modal surface covers the app. */
@@ -51,38 +50,41 @@ export function useShell(): ShellContextValue {
 
 /**
  * Application frame.
- * - Phone: content + bottom navigation; navigation lives in a slide-out drawer.
- * - Tablet and wider: a narrow icon rail. Its "more" button opens the full navigation as a
- *   flyout over the list pane; the user can pin that sidebar open instead of the rail.
+ * - Phone: content + bottom navigation; the navigation lives in a slide-out drawer.
+ * - Tablet and wider: one navigation column that is either collapsed (70px icon rail) or
+ *   expanded (240px, labels visible). It is the same element and the same content in both
+ *   states; the width comes from CSS (`--nav-width`, driven by `<html data-nav>`), which an
+ *   inline script sets before first paint, so a stored choice never flashes.
  * Phone vs. wider is decided by CSS; this component only holds the state.
  */
 export function AppShell({
-  rail,
-  sidebar,
+  navigation,
   bottomNav,
   drawerTitle,
   closeLabel,
   children,
 }: {
   closeLabel: string;
-  rail: ReactNode;
-  sidebar: (variant: SidebarVariant) => ReactNode;
+  navigation: (variant: NavigationVariant) => ReactNode;
   bottomNav: ReactNode;
   drawerTitle: string;
   children: ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [flyoutOpen, setFlyoutOpen] = useState(false);
   const [navigationInert, setNavigationInert] = useState(false);
-  const sidebarMode = useSyncExternalStore(subscribe, readMode, () => "auto" as const);
-  const pinned = sidebarMode === "false";
+  const pinned = useSyncExternalStore(subscribe, readExpanded, () => false);
 
-  // The drawer and the flyout are opened from buttons that are not Radix triggers, so the
-  // element to give focus back to on close is remembered here.
+  useEffect(() => {
+    // Read from storage, not from `pinned`: during hydration that still holds the server's
+    // value, and writing it here would undo the inline script and replay the expansion.
+    reflect(readExpanded());
+    // Width changes animate only from now on: nothing may slide while the page first loads.
+    document.documentElement.dataset.navReady = "";
+  }, []);
+
+  // The drawer is opened from a button that is not a Radix trigger, so the element to give
+  // focus back to on close is remembered here.
   const openerRef = useRef<HTMLElement | null>(null);
-  const rememberOpener = () => {
-    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-  };
   const restoreFocus = (event: Event) => {
     const opener = openerRef.current;
     if (opener?.isConnected) {
@@ -92,12 +94,13 @@ export function AppShell({
   };
 
   const togglePinned = useCallback(() => {
+    const next = !readExpanded();
     try {
-      window.localStorage.setItem(STORAGE_KEY, readMode() === "false" ? "true" : "false");
+      window.localStorage.setItem(NAV_STORAGE_KEY, next ? "false" : "true");
     } catch {
       // Preference is not persisted when storage is unavailable.
     }
-    setFlyoutOpen(false);
+    reflect(next);
     listeners.forEach((listener) => listener());
   }, []);
 
@@ -105,24 +108,16 @@ export function AppShell({
     () => ({
       drawerOpen,
       openDrawer: () => {
-        rememberOpener();
+        openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         setDrawerOpen(true);
       },
       closeDrawer: () => setDrawerOpen(false),
-      flyoutOpen,
-      openFlyout: () => {
-        rememberOpener();
-        setFlyoutOpen(true);
-      },
-      closeNavigation: () => {
-        setDrawerOpen(false);
-        setFlyoutOpen(false);
-      },
+      closeNavigation: () => setDrawerOpen(false),
       pinned,
       togglePinned,
       setNavigationInert,
     }),
-    [drawerOpen, flyoutOpen, pinned, togglePinned],
+    [drawerOpen, pinned, togglePinned],
   );
 
   return (
@@ -131,9 +126,9 @@ export function AppShell({
         <aside
           data-pinned={pinned}
           inert={navigationInert}
-          className="mf-sidebar hidden shrink-0 flex-col pl-[env(safe-area-inset-left,0px)] md:flex data-[pinned=false]:bg-rail data-[pinned=true]:bg-surface"
+          className="mf-sidebar hidden shrink-0 flex-col overflow-hidden bg-rail pl-[env(safe-area-inset-left,0px)] md:flex"
         >
-          {pinned ? sidebar("pinned") : rail}
+          {navigation("aside")}
         </aside>
         <main className="flex min-h-0 min-w-0 flex-1 flex-col">{children}</main>
         {bottomNav}
@@ -147,33 +142,8 @@ export function AppShell({
           className="bg-surface md:hidden"
         >
           <DialogPrimitive.Title className="sr-only">{drawerTitle}</DialogPrimitive.Title>
-          <div className="flex min-h-0 flex-1 flex-col">{sidebar("drawer")}</div>
+          <div className="flex min-h-0 flex-1 flex-col">{navigation("drawer")}</div>
         </SheetContent>
-      </DialogPrimitive.Root>
-      {/* Modal for focus (trap, Escape, focus return) but without a backdrop: it is a panel, not a dialog box. */}
-      <DialogPrimitive.Root open={flyoutOpen && !pinned} onOpenChange={setFlyoutOpen}>
-        <DialogPrimitive.Portal>
-          <DialogPrimitive.Content
-            aria-describedby={undefined}
-            // Focus starts on the open view (or the panel itself), not on the first button:
-            // a focused button would show its tooltip, and Escape would close that first.
-            onOpenAutoFocus={(event) => {
-              event.preventDefault();
-              const panel = event.currentTarget as HTMLElement;
-              (panel.querySelector<HTMLElement>('nav a[aria-current="page"]') ?? panel).focus();
-            }}
-            onCloseAutoFocus={restoreFocus}
-            // Radix gives Escape only to the topmost layer, so an open tooltip of a focused
-            // button would take it and leave the panel open. Close on the key itself.
-            onKeyDown={(event) => {
-              if (event.key === "Escape") setFlyoutOpen(false);
-            }}
-            className="fixed inset-y-0 left-[var(--nav-offset)] z-50 flex w-60 max-w-[calc(100vw-var(--nav-offset))] flex-col border-r border-border bg-surface shadow-lg outline-none data-[state=open]:animate-flyout-in max-md:hidden"
-          >
-            <DialogPrimitive.Title className="sr-only">{drawerTitle}</DialogPrimitive.Title>
-            {sidebar("flyout")}
-          </DialogPrimitive.Content>
-        </DialogPrimitive.Portal>
       </DialogPrimitive.Root>
     </ShellContext>
   );

@@ -31,11 +31,7 @@ test.describe("inbox", () => {
   test("narrows to a single account", async ({ page }) => {
     const api = await mockApi(page);
     await page.goto("/en/mail/inbox");
-    // Accounts live in the flyout next to the rail.
-    await page.getByRole("button", { name: "Accounts and folders" }).click();
-    const flyout = page.getByRole("dialog", { name: "Navigation" });
-    await flyout.getByRole("navigation", { name: "Accounts" }).getByRole("link", { name: "Personal" }).click();
-    await expect(flyout).toBeHidden();
+    await page.getByRole("navigation", { name: "Accounts" }).getByRole("link", { name: "Personal" }).click();
     await expect(page).toHaveURL(/account=acc-1/);
     await expect(page.getByRole("heading", { level: 1, name: "Inbox" })).toBeVisible();
     await expect(page.locator("header").getByText("Personal")).toBeVisible();

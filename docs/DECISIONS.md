@@ -150,7 +150,7 @@ real servers shows it is needed.
 
 ## D31 — Adopt the reference client's layout, not its identity
 The frontend follows `docs/design/SPARK_REFERENCE.md` for layout, structure, density, states and
-behaviour: icon rail with an on-demand flyout, date-grouped three-line list with avatars and
+behaviour: icon rail that expands in place, date-grouped three-line list with avatars and
 gutter quick actions, messages as cards, document-like composer and docked reply, search as a
 mode of the list, settings as a dialog. Name, logo, glyphs, illustrations and colour values are
 not taken: the palette stays MailFlow's (ink-blue accent, own neutrals), icons are Lucide, the
@@ -177,8 +177,7 @@ between its modal and non-modal content remounts the children, which would run t
 effect twice.
 
 ## D34 — Where the reference was not followed
-- **Flyout closes on Escape, outside click or selection, not when the pointer leaves** — pointer
-  leave has no keyboard or touch equivalent.
+- **No hover flyout**: the navigation expands in place instead (D35).
 - **Formatting bar is always visible** in the composer — a selection-only toolbar is unreachable
   on touch.
 - **Send is a labelled primary button**, close is an X button, the settings dialog closes with an
@@ -193,3 +192,25 @@ effect twice.
   the page under the pointer between mouse-down and mouse-up.
 - **Month headings** use the locale's standalone month name; week boundaries follow the locale
   (Sunday in en-US, Monday in uk).
+
+## D35 — One navigation layout; the flyout is removed
+The rail and the open menu were two component trees, so opening the menu moved every icon,
+turned Compose into a wide button and reflowed the language and theme controls. They are now one
+column of rows (fixed icon cell + label) that only changes width; nothing else moves, which is
+asserted per icon in `e2e/layout.spec.ts`. Consequences:
+- The overlay flyout ("Accounts and folders") is gone. Its only content the rail lacked was the
+  account switcher and the mailbox's folders. Accounts are now rows of the column in both states
+  (colour dot as the icon); the folders are shown when expanded, because a column of identical
+  folder icons says nothing.
+- Compose is an ordinary row (no accent button) and the segmented language / theme switches left
+  the navigation (they remain in Settings → Appearance and on the sign-in pages), so the top and
+  bottom blocks have the same rows in both states. The phone drawer uses the same rows.
+- The column keeps the `--rail` surface when expanded: changing the surface would read as a
+  different panel.
+- The state lives on `<html data-nav>`, set by an inline script before first paint, instead of
+  being derived from React state after hydration, which showed the rail for a few frames.
+- `--nav-width` is a registered custom property transitioned on `:root`, so the column, the
+  panes and the composer cannot get out of step; browsers without `@property` switch instantly.
+- The language and theme rows keep their accessible names ("Switch language to …") while the
+  visible label names the current value ("Language: English"), as required for a stable name in
+  both states. This does not satisfy WCAG 2.5.3 (label in name) literally; see LIMITATIONS.

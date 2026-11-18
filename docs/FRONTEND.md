@@ -40,7 +40,7 @@ Tokens: `docs/architecture/DESIGN_SYSTEM.md` (implemented in `frontend/src/app/g
 
 - `src/app/[locale]/(auth)` — login, register, verify-email, forgot-password, reset-password.
 - `src/app/[locale]/(application)` — `mail/[view]`, `mail/[view]/[threadId]`, `settings/*`.
-  `_shell/` is the composition root of the signed-in frame (`Rail`, `SidebarContent`,
+  `_shell/` is the composition root of the signed-in frame (`Navigation`, `QuickPreferences`,
   `BottomNav`). `settings/layout.tsx` composes the settings dialog with `MailBackdrop`.
 - Search is the mail view `search` (`/mail/search?q=`), not a separate route tree: the list pane
   switches to its search mode and results reuse the list rows and the reader.
@@ -64,7 +64,7 @@ Tokens: `docs/architecture/DESIGN_SYSTEM.md` (implemented in `frontend/src/app/g
   401 (`/auth/me` probe, login) pass `skipAuthRedirect`.
 
 Nothing sensitive is stored in the browser: the session cookie is HttpOnly, and `localStorage`
-only holds the theme (`mf-theme`) and sidebar (`mf-sidebar`, pinned or rail) preferences. Recent
+only holds the theme (`mf-theme`) and navigation (`mf-sidebar`, expanded or collapsed) preferences. Recent
 search queries are kept in memory for the tab and never written to storage.
 
 ## Server state
@@ -81,9 +81,13 @@ shown to the next.
 Layout, sizes and states: `docs/architecture/DESIGN_SYSTEM.md` and
 `docs/architecture/RESPONSIVE_ARCHITECTURE.md`. What each part does:
 
-- **Navigation** — `AppShell` renders the rail (or the pinned sidebar) and owns the flyout and
-  the phone drawer. `FolderNav variant="rail"` is the icon list; the default variant is the
-  labelled list with unread counts used in the flyout, the pinned sidebar and the drawer.
+- **Navigation** — `AppShell` renders one navigation column and holds its state (collapsed
+  rail / expanded menu) and the phone drawer. `Navigation` is the single layout for all three;
+  `FolderNav`, `AccountSwitcher`, `CustomFolderNav` and `QuickPreferences` render its rows from
+  the classes in `shared/components/layout/nav-row.ts`. Details: RESPONSIVE_ARCHITECTURE.
+- The root layout renders two inline scripts as the first nodes of `<body>`: the theme script
+  and `navInitScript`. They are separate tags on purpose: `themeInitScript` is exported from a
+  client module, and concatenating it on the server yields an error stub instead of the script.
 - **Thread list** (`modules/inbox`) — header (title, account scope, unread filter, sync, search,
   new message; a back button in a custom folder), then rows under date headings. Headings come
   from `dateGroup()` (`Today`, `Yesterday`, `This week`, `Last week`, month, month + year),

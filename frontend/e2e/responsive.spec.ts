@@ -58,7 +58,8 @@ const TEXT = {
     settings: "Settings",
     subject: "Subject",
     to: "To",
-    more: "Accounts and folders",
+    expand: "Expand menu",
+    collapse: "Collapse menu",
     search: "Search mail",
     searchHint: "Search by words",
     searchResults: "Search",
@@ -85,7 +86,8 @@ const TEXT = {
     settings: "Налаштування",
     subject: "Тема",
     to: "Кому",
-    more: "Облікові записи й папки",
+    expand: "Розгорнути меню",
+    collapse: "Згорнути меню",
     search: "Пошук у пошті",
     searchHint: "Пошук за словами",
     searchResults: "Пошук",
@@ -177,20 +179,30 @@ async function walkthrough(page: Page, size: Size, locale: Locale, theme: "light
     await expect(drawer).toBeHidden();
   } else {
     const sidebar = page.locator("aside.mf-sidebar");
-    // The icon rail is the navigation at every width from 768px; the full list is a flyout.
+    // One navigation column from 768px: the 70px icon rail, expanded in place to 240px.
     expect((await sidebar.boundingBox())?.width ?? 0, `${label} rail`).toBe(70);
-    const more = sidebar.getByRole("button", { name: t.more });
-    await more.click();
-    const flyout = page.getByRole("dialog", { name: t.menu });
-    await expectInViewport(page, flyout, `${label} flyout`);
-    // Polled: the panel slides in over 150ms.
-    await expect.poll(async () => (await flyout.boundingBox())?.x, { message: `${label} flyout starts after the rail` }).toBe(70);
-    expect((await flyout.boundingBox())?.width, `${label} flyout width`).toBe(240);
-    await expectNoHorizontalOverflow(page, `${label} flyout`);
+    const toggle = sidebar.getByRole("button", { name: t.expand });
+    const toggleBox = await toggle.boundingBox();
+    const settingsLink = sidebar.getByRole("link", { name: t.settings });
+    const settingsBox = await settingsLink.boundingBox();
+    await expectInViewport(page, settingsLink, `${label} settings at the bottom of the rail`);
+    await toggle.click();
+    await expect.poll(async () => (await sidebar.boundingBox())?.width, { message: `${label} expanded menu` }).toBe(240);
+    const collapse = sidebar.getByRole("button", { name: t.collapse });
+    expect(await collapse.boundingBox(), `${label} toggle did not move`).toEqual(toggleBox);
+    const settingsExpanded = await settingsLink.boundingBox();
+    expect([settingsExpanded?.x, settingsExpanded?.y], `${label} settings row did not move`).toEqual([settingsBox?.x, settingsBox?.y]);
+    await expectNoHorizontalOverflow(page, `${label} expanded menu`);
+    // Labels stay inside the column in both languages.
+    for (const text of await sidebar.locator(".mf-nav-label").all()) {
+      const box = await text.boundingBox();
+      if (box) expect(box.x + box.width, `${label} label inside the menu`).toBeLessThanOrEqual(240.5);
+    }
+    await expect(list, `${label} list beside the expanded menu`).toBeVisible();
     await shot(page, size, locale, theme, "3-navigation");
-    await page.keyboard.press("Escape");
-    await expect(flyout).toBeHidden();
-    await expect(more, `${label} focus returns to the rail`).toBeFocused();
+    await collapse.click();
+    await expect.poll(async () => (await sidebar.boundingBox())?.width, { message: `${label} collapsed again` }).toBe(70);
+    await expect(toggle, `${label} focus stays on the toggle`).toBeFocused();
   }
 
   // 4. Reader: long subject, long addresses, a 900px-wide table and a long URL

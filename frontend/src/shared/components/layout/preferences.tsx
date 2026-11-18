@@ -32,29 +32,46 @@ function useSwitchLocale(onChange?: (locale: AppLocale) => void): (next: AppLoca
   };
 }
 
+/** Parts of a navigation row, supplied by the caller (see `nav-row.ts`). */
+interface RowParts {
+  className?: string;
+  iconClassName?: string;
+  labelClassName?: string;
+  /** The row's label is visible, so the tooltip that repeats it stays closed. */
+  expanded?: boolean;
+}
+
 /**
- * One-button language control for narrow places (the navigation rail): shows the current
- * language code and switches to the next one.
+ * Language as one navigation row: the icon cell shows the current language code, the label
+ * (visible when the column is expanded) names it, and a click switches to the next language.
  */
 export function LanguageToggle({
   label,
+  text,
   onChange,
   className,
-}: {
-  /** Receives the name of the language the button switches to. */
+  iconClassName,
+  labelClassName,
+  expanded = false,
+}: RowParts & {
+  /** Accessible name; receives the name of the language the button switches to. */
   label: (nextLanguage: string) => string;
+  /** Visible label; receives the name of the current language. */
+  text: (currentLanguage: string) => string;
   onChange?: (locale: AppLocale) => void;
-  className?: string;
 }) {
   const locale = useLocale() as AppLocale;
   const switchLocale = useSwitchLocale(onChange);
   const next = locales[(locales.indexOf(locale) + 1) % locales.length] ?? locale;
-  const text = label(LOCALE_NAMES[next].full);
+  const name = label(LOCALE_NAMES[next].full);
   return (
-    <Tooltip label={text} side="right">
-      <button type="button" aria-label={text} onClick={() => switchLocale(next)} className={className}>
-        <span aria-hidden className="text-[11px] leading-none font-semibold tracking-wide">
+    <Tooltip label={name} side="right" disabled={expanded}>
+      <button type="button" aria-label={name} onClick={() => switchLocale(next)} className={className}>
+        <span aria-hidden className={cn("text-[11px] leading-none font-semibold tracking-wide", iconClassName)}>
           {LOCALE_NAMES[locale].short}
+        </span>
+        <span aria-hidden className={labelClassName}>
+          {text(LOCALE_NAMES[locale].full)}
         </span>
       </button>
     </Tooltip>
@@ -139,37 +156,47 @@ export function ThemeSwitch({
 }
 
 /**
- * One-button theme control for narrow places (the navigation rail): shows the current theme's
- * icon and moves to the next one (system → light → dark).
+ * Theme as one navigation row: the icon cell shows the current theme's icon, the label names
+ * it, and a click moves to the next theme (system → light → dark).
  */
 export function ThemeCycle({
   label,
+  text,
   names,
   onChange,
   className,
-}: {
-  /** Receives the name of the theme the button switches to. */
+  iconClassName,
+  labelClassName,
+  expanded = false,
+}: RowParts & {
+  /** Accessible name; receives the name of the theme the button switches to. */
   label: (nextTheme: string) => string;
+  /** Visible label; receives the name of the current theme. */
+  text: (currentTheme: string) => string;
   names: Record<ThemePreference, string>;
   onChange?: (theme: ThemePreference) => void;
-  className?: string;
 }) {
   const { theme, setTheme } = useTheme();
   const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length] ?? "system";
   const Icon = THEME_ICONS[theme];
-  const text = label(names[next]);
+  const name = label(names[next]);
   return (
-    <Tooltip label={text} side="right">
+    <Tooltip label={name} side="right" disabled={expanded}>
       <button
         type="button"
-        aria-label={text}
+        aria-label={name}
         onClick={() => {
           setTheme(next);
           onChange?.(next);
         }}
         className={className}
       >
-        <Icon className="size-5" aria-hidden />
+        <span className={iconClassName}>
+          <Icon className="size-5" aria-hidden />
+        </span>
+        <span aria-hidden className={labelClassName}>
+          {text(names[theme])}
+        </span>
       </button>
     </Tooltip>
   );

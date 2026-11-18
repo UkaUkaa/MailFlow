@@ -61,7 +61,7 @@ for (const size of SIZES) {
     const errors = collectReactErrors(page);
     await mockApi(page);
     await deliverBuffered(page);
-    // The server renders the rail; the stored preference swaps in the sidebar on the client.
+    // The server renders the collapsed column; an inline script widens it before first paint.
     await page.addInitScript(() => window.localStorage.setItem("mf-sidebar", "false"));
     for (const path of ["mail/inbox", "settings/accounts"]) {
       await page.goto(`/en/${path}`);

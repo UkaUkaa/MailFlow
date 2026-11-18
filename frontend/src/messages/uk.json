@@ -48,8 +48,8 @@
     "switchTheme": "Змінити тему на {theme}",
     "pinSidebar": "Розгорнути меню",
     "unpinSidebar": "Згорнути меню",
-    "more": "Облікові записи й папки",
-    "accounts": "Облікові записи"
+    "languageRow": "Мова: {language}",
+    "themeRow": "Тема: {theme}"
   },
   "accounts": {
     "title": "Підключені облікові записи",
