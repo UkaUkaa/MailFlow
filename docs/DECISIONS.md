@@ -274,3 +274,12 @@ inside the request. A real SMTP round trip (hundreds of milliseconds) would othe
 addresses exist. Celery was not used: the task would have to carry the address and the one-time
 token, and Celery arguments must hold only IDs. A process restart between the response and the
 send loses the message; the user can request a new one (resend is rate limited).
+
+## D40 — Auto-deploy builds on the server after green CI
+Every push to `main` whose CI (backend and frontend suites) is green is deployed by the `deploy`
+job in `.github/workflows/ci.yml`: SSH to the server, `scripts/deploy.sh <sha>`, which checks out
+the tested commit and runs `docker compose up -d --build`. Images are built on the server rather
+than pushed to a registry: it matches the documented production command, needs no registry
+credentials and keeps one server simple. The cost is build time and CPU on the server and a short
+restart window. The job deploys the exact tested SHA, not the branch head, and holds only a
+dedicated SSH key. No automatic rollback; reverting on `main` redeploys the previous state.

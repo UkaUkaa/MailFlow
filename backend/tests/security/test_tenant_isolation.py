@@ -409,7 +409,9 @@ async def test_account_avatar_is_isolated(alice, bob, world):
     theirs = world[bob.email]["account"]
     url = f"/api/v1/accounts/{theirs}/avatar"
     png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
-    assert (await bob.client.put(url, files={"file": ("a.png", png, "image/png")})).status_code == 200
+    assert (
+        await bob.client.put(url, files={"file": ("a.png", png, "image/png")})
+    ).status_code == 200
     assert (await alice.client.get(url)).status_code == 404
     response = await alice.client.put(url, files={"file": ("a.png", png, "image/png")})
     assert response.status_code == 404

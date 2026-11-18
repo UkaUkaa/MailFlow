@@ -49,6 +49,38 @@ Requirements:
 - Secrets supplied through `.env` with mode 600 or, better, your orchestrator's secret store.
 - Backups for `pgdata` (see `DATABASE.md`) and a separate backup of the vault key.
 
+### Auto-deploy from `main`
+
+`.github/workflows/ci.yml` runs every test on each pull request and each push to `main`. When
+backend and frontend jobs are both green on `main`, the `deploy` job connects to the server over
+SSH and runs `scripts/deploy.sh <sha>` in the checkout: it moves to exactly the tested commit
+(`git reset --hard`, so edits to tracked files on the server are lost; `.env`, certificates and
+volumes are untouched), runs `docker compose up -d --build` (migrations included), waits for
+backend, frontend and nginx to be healthy, then prunes dangling images. A red test means no
+deploy; a failed deploy marks the job red and leaves the previous containers where `up` stopped.
+Deploys never run in parallel. There is no automatic rollback: revert on `main` to roll back.
+
+One-time setup:
+
+1. On the server: Docker with the compose plugin and git; the repository cloned at the deploy
+   path with a working `.env` and certificates; the stack started once by hand; the deploy user
+   in the `docker` group.
+2. A dedicated key pair: `ssh-keygen -t ed25519 -f ~/.ssh/mailflow_deploy -N ""`, public key in
+   the deploy user's `~/.ssh/authorized_keys`.
+3. GitHub, Settings → Secrets and variables → Actions:
+   - secrets `DEPLOY_SSH_KEY` (the private key) and `DEPLOY_KNOWN_HOSTS`
+     (`ssh-keyscan -p <port> <host>`);
+   - variables `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`, `DEPLOY_URL`
+     (`https://your.domain`, checked for HTTP 200 on `/en/login`) and optional `DEPLOY_PORT`.
+
+The script runs plain `docker compose`, so the server chooses the files with `COMPOSE_FILE` in
+its `.env`: unset means `docker-compose.yml` only (a host reverse proxy terminates TLS and forwards
+to the bundled Nginx), `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml` when the bundled
+Nginx owns ports 80/443.
+
+Until `DEPLOY_HOST` is set the deploy job is skipped. `scripts/deploy.sh <sha>` can also be run
+by hand on the server.
+
 ## Environment variables
 
 | Variable | Required | Default | Description |
