@@ -375,3 +375,19 @@ leaves MailFlow for that service.
 
 **Cost.** Mail content is processed by a third party the user chose, under that party's terms;
 this is disclosed in the form and the Privacy Policy. Drafts arrive whole (no streaming).
+
+
+## D44 — Google re-confirmation stands in for the password on delete/deactivate
+
+**Context.** Accounts created with "Continue with Google" get a random, unknown password, so
+deletion and deactivation (both password-confirmed) were impossible without first resetting the
+password by email.
+
+**Decision.** A user with a linked Google identity may confirm either action with a fresh Google
+sign-in instead of the password. The grant is single use, bound to the user and the action, lives
+5 minutes in Redis and travels as an HttpOnly cookie, never in the URL. The typed `DELETE` stays.
+
+**Rejected.** Skipping confirmation for passwordless users (a stolen session could delete the
+account); an emailed confirmation link (slower, and the user already proves identity to Google).
+A `has_password` flag was not added: existing Google users cannot be told apart reliably, so the
+dialog offers Google whenever an identity is linked and the password field always.

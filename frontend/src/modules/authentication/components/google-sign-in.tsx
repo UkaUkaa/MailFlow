@@ -17,7 +17,7 @@ function signInError(value: string | null): SignInError | null {
   return (KNOWN_ERRORS as readonly string[]).includes(value) ? (value as SignInError) : "provider_error";
 }
 
-function GoogleGlyph() {
+export function GoogleGlyph() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden className="size-[18px]">
       <path fill="#4285F4" d="M23.5 12.27c0-.82-.07-1.6-.2-2.36H12v4.47h6.45a5.52 5.52 0 0 1-2.4 3.62v3h3.88c2.27-2.09 3.57-5.17 3.57-8.73Z" />

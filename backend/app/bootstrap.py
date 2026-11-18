@@ -41,7 +41,9 @@ from app.modules.assistant.infrastructure.repository import SqlAssistantConfigRe
 from app.modules.attachments.application import AttachmentService
 from app.modules.attachments.infrastructure import SafeAttachmentNormalizer, SqlAttachmentRepository
 from app.modules.audit.infrastructure import SqlAuditLog
+from app.modules.authentication.application.external_sign_in import ReauthGrantVerifier
 from app.modules.authentication.infrastructure.repositories import SqlSessionRepository
+from app.modules.authentication.infrastructure.sign_in_states import RedisReauthGrantStore
 from app.modules.email_accounts.application.services import AccountService, ConnectAccountService
 from app.modules.email_accounts.application.sessions import ProviderSessionFactory
 from app.modules.email_accounts.infrastructure.repositories import (
@@ -302,6 +304,7 @@ class Services:
             self.accounts,
             RedisTenantCache(self._rt.redis),
             self.audit,
+            ReauthGrantVerifier(RedisReauthGrantStore(self._rt.redis)),
         )
 
     @cached_property

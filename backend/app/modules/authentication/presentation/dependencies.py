@@ -40,7 +40,10 @@ from app.modules.authentication.infrastructure.repositories import (
     SqlOneTimeTokenRepository,
     SqlSessionRepository,
 )
-from app.modules.authentication.infrastructure.sign_in_states import RedisSignInStateStore
+from app.modules.authentication.infrastructure.sign_in_states import (
+    RedisReauthGrantStore,
+    RedisSignInStateStore,
+)
 from app.modules.users.infrastructure import SqlUserRepository
 from app.shared.domain.errors import UnauthenticatedError
 
@@ -169,6 +172,7 @@ def get_google_sign_in_service(
         get_password_hasher(),
         audit,
         get_clock(),
+        RedisReauthGrantStore(redis),
     )
 
 

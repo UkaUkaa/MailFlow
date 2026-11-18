@@ -183,3 +183,13 @@ class SqlIdentityRepository:
         )
         self._session.add(row)
         await self._session.flush()
+
+    async def is_linked(self, user_id: uuid.UUID, provider: SignInProviderKind) -> bool:
+        found = await self._session.scalar(
+            select(UserIdentityModel.id)
+            .where(
+                UserIdentityModel.user_id == user_id, UserIdentityModel.provider == provider.value
+            )
+            .limit(1)
+        )
+        return found is not None

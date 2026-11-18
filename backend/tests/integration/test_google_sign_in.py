@@ -28,9 +28,13 @@ class FakeGoogle:
     identity: ExternalIdentity | None = None
     nonces: list[str] = field(default_factory=list)
     fail: bool = False
+    reauthenticate: list[bool] = field(default_factory=list)
 
-    def authorization_url(self, *, state: str, code_challenge: str, nonce: str) -> str:
+    def authorization_url(
+        self, *, state: str, code_challenge: str, nonce: str, reauthenticate: bool = False
+    ) -> str:
         self.nonces.append(nonce)
+        self.reauthenticate.append(reauthenticate)
         return f"https://accounts.example/auth?state={state}&code_challenge={code_challenge}"
 
     async def exchange(self, *, code: str, code_verifier: str, nonce: str) -> ExternalIdentity:

@@ -641,6 +641,21 @@
         "confirmDescription": "MailFlow will revoke access to your mailboxes and delete all your data. This cannot be undone. Your email at the provider is not affected.",
         "confirmAction": "Delete permanently",
         "typeToConfirm": "Type {word} to confirm"
+      },
+      "google": {
+        "action": "Confirm with Google",
+        "hint": "Signed up with Google? Confirm by signing in to Google again instead of entering a password.",
+        "or": "or enter your password",
+        "confirmed": "Confirmed with Google. Finish within 5 minutes.",
+        "expired": "The Google confirmation expired or was already used. Confirm again.",
+        "errors": {
+          "reauth_mismatch": "That Google account is not the one linked to your MailFlow account.",
+          "reauth_stale": "Google did not ask you to sign in again. Please try again.",
+          "access_denied": "Google confirmation was cancelled.",
+          "account_disabled": "This MailFlow account is deactivated.",
+          "not_configured": "Google sign-in is not available on this server.",
+          "provider_error": "Google confirmation failed. Please try again."
+        }
       }
     },
     "close": "Close settings"
