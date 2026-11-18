@@ -12,6 +12,7 @@ from app.modules.authentication.infrastructure.models import (
 from app.modules.email_accounts.infrastructure.models import EmailAccountModel, OAuthStateModel
 from app.modules.emails.infrastructure.models import EmailMessageModel, EmailThreadModel
 from app.modules.folders.infrastructure import EmailFolderModel
+from app.modules.outbox.infrastructure import OutboxAttachmentModel, OutboxItemModel
 from app.modules.settings.infrastructure import UserSettingsModel
 from app.modules.synchronization.infrastructure import SyncStateModel
 from app.modules.token_vault.infrastructure import AccountCredentialModel
@@ -28,6 +29,8 @@ __all__ = [
     "EmailThreadModel",
     "EmailVerificationTokenModel",
     "OAuthStateModel",
+    "OutboxAttachmentModel",
+    "OutboxItemModel",
     "PasswordResetTokenModel",
     "SyncStateModel",
     "UserIdentityModel",

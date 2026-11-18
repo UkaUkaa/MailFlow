@@ -18,6 +18,7 @@ from app.integrations.email_providers.contracts import (
 )
 from app.modules.attachments.application import AttachmentNormalizer, AttachmentService
 from app.modules.email_accounts.application.sessions import ProviderSession, ProviderSessionFactory
+from app.modules.email_accounts.domain import AccountStatus
 from app.modules.emails.application.ingestion import MessageIngestor
 from app.modules.emails.application.ports import HtmlSanitizer, MailRepository
 from app.modules.emails.domain.entities import DraftMeta, Message
@@ -29,6 +30,7 @@ from app.shared.domain.errors import (
     InvalidInputError,
     NotFoundError,
     PayloadTooLargeError,
+    ProviderAuthRequiredError,
     UnsupportedError,
 )
 
@@ -36,6 +38,11 @@ MAX_RECIPIENTS = 100
 MAX_SUBJECT = 998
 MAX_BODY_CHARS = 1_000_000
 IDEMPOTENCY_TTL = 24 * 3600
+
+
+def check_idempotency_key(key: str) -> None:
+    if not 8 <= len(key) <= 128:
+        raise InvalidInputError("A valid Idempotency-Key header is required.")
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,6 +199,45 @@ class ComposeService:
 
     # -- sending ---------------------------------------------------------------------------
 
+    async def preflight(
+        self, user_id: uuid.UUID, command: ComposeCommand, files: list[UploadedFile]
+    ) -> None:
+        """Everything ``send`` would reject up front, without contacting the provider.
+
+        Used when a send is queued (send later, undo send) so the user hears about a bad
+        request now rather than from a failed outbox item later. Counts against the same
+        hourly send limit as an immediate send.
+        """
+        self._validate(command, sending=True)
+        account = await self._sessions.get_account(user_id, command.account_id)
+        if account.status is AccountStatus.NEEDS_REAUTH:
+            raise ProviderAuthRequiredError
+        if not account.is_active:
+            raise UnsupportedError("This account is not active.")
+        await self._source(user_id, command)
+        if command.draft_id:
+            await self._draft(user_id, command.draft_id)
+        if len(files) + len(command.forward_attachment_ids) > self._limits.max_attachments:
+            raise InvalidInputError(problems=[FieldProblem("files", "too_many_files")])
+        total = sum(len(f.content) for f in files)
+        for attachment_id in command.forward_attachment_ids:
+            meta = await self._attachments.get(user_id, attachment_id)
+            if command.source_message_id is None or meta.message_id != command.source_message_id:
+                raise NotFoundError("The attachment does not belong to the forwarded message.")
+            total += meta.size
+        if total > self._limits.max_attachment_bytes:
+            raise PayloadTooLargeError("Attachments exceed the size limit.")
+        await self._limiter.hit(f"send:{user_id}", limit=60, window_seconds=3600)
+
+    async def draft_exists(self, user_id: uuid.UUID, draft_id: uuid.UUID) -> bool:
+        message = await self._mail.get_message(user_id, draft_id)
+        return message is not None and message.flags.is_draft
+
+    def clean_body(self, body_html: str) -> tuple[str, str]:
+        """Sanitized HTML and its plain-text rendering."""
+        html = self._sanitizer.sanitize(body_html).html
+        return html, self._sanitizer.to_text(html)
+
     async def send(
         self,
         user_id: uuid.UUID,
@@ -199,12 +245,17 @@ class ComposeService:
         files: list[UploadedFile],
         *,
         idempotency_key: str,
+        rate_limited: bool = True,
     ) -> SendResult:
-        """Send a message exactly once per idempotency key."""
-        if not 8 <= len(idempotency_key) <= 128:
-            raise InvalidInputError("A valid Idempotency-Key header is required.")
+        """Send a message exactly once per idempotency key.
+
+        ``rate_limited=False`` is for the outbox worker: a queued send was already counted
+        against the user's limit by ``preflight`` when it was accepted.
+        """
+        check_idempotency_key(idempotency_key)
         self._validate(command, sending=True)
-        await self._limiter.hit(f"send:{user_id}", limit=60, window_seconds=3600)
+        if rate_limited:
+            await self._limiter.hit(f"send:{user_id}", limit=60, window_seconds=3600)
         key = f"mf:u:{user_id}:idem:send:{idempotency_key}"
         previous = await self._idempotency.begin(key, ttl_seconds=IDEMPOTENCY_TTL)
         if previous is not None:

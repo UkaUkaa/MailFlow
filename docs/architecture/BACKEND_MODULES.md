@@ -9,6 +9,7 @@
 | `emails` | Messages and threads: listing, reading, actions, composing, drafts | `email_messages`, `email_threads` |
 | `folders` | System and provider folders/labels, unread counts | `email_folders`, `message_folders` |
 | `attachments` | Attachment metadata, authorized streaming download | `attachments` |
+| `outbox` | Scheduled sends: send later and undo send (D42); worker-side dispatch | `outbox_items`, `outbox_attachments` |
 | `search` | Full-text search over the user's stored message metadata | — (reads `emails` through its public interface) |
 | `synchronization` | Sync state, locks, initial/incremental/manual sync, scheduling | `sync_states` |
 | `settings` | Per-user preferences (language, theme, remote images) | `user_settings` |
@@ -50,6 +51,7 @@ email_accounts ─> token_vault, synchronization(port)
 emails ─> email_accounts, folders, token_vault, attachments
 attachments ─> email_accounts, token_vault
 search ─> emails
+outbox ─> emails, settings
 synchronization ─> email_accounts, emails, folders, attachments, token_vault
 users (deletion) ─> authentication(port), email_accounts(port)
 ```

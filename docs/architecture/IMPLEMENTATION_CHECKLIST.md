@@ -36,6 +36,8 @@ Update this file whenever an item changes state.
 - [x] Compose / reply / reply-all / forward with idempotent send
 - [~] Drafts (provider-backed; attachments are not saved with drafts)
 - [x] Attachments (metadata + safe download), search, unread counts
+- [x] Send later and undo send on a scheduled outbox (D42): schedule, list, reschedule, cancel,
+      exactly-once dispatch by Celery; verified with the fake provider and GreenMail SMTP
 - [x] Account deletion and deactivation
 
 ## Phase 6 — Responsive frontend

@@ -253,6 +253,7 @@ async def test_profile_and_settings(alice):
         "account_tint": "subtle",
         "accent_color": "blue",
         "reader_text_size": "default",
+        "undo_send_seconds": 5,  # undo send on by default (D42)
     }
     updated = await alice.client.patch("/api/v1/settings", json={"locale": "uk", "theme": "dark"})
     assert updated.json()["locale"] == "uk" and updated.json()["theme"] == "dark"

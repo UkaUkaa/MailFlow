@@ -8,6 +8,13 @@
   reader keeps remote images blocked.
 
 ### Added
+- **Send later and undo send** (D42). A "Send later" menu next to Send (later today, tomorrow
+  morning, Monday morning, or any date and time), a Scheduled view to reschedule or cancel what
+  is waiting, and an Undo toast after every send for a configurable window (Settings: off, 5,
+  10, 20 or 30 s; default 5 s). Both run on a server-side scheduled outbox (`outbox_items`,
+  migration 0006, tenant RLS): `POST /emails/send` accepts `send_at` and answers `202` for held
+  messages; new `/outbox` endpoints list, reschedule and cancel. Celery beat task
+  `outbox.dispatch_due` and worker task `outbox.send` deliver due messages exactly once.
 - CI (`.github/workflows/ci.yml`): backend ruff, mypy and pytest against the dev
   PostgreSQL/Redis/GreenMail services; frontend lint, typecheck, Vitest, build and Playwright
   e2e. Runs on every PR and push to `main`.

@@ -166,3 +166,19 @@ Honest list of what is missing or partial. Update whenever something here change
 - Database backups are documented, not automated.
 - No admin interface for user status or sync health.
 - Performance has not been benchmarked.
+
+## Send later and undo send (D42)
+
+- With the undo window on (default 5 s) a message leaves only when a Celery worker runs. If the
+  workers are down it waits; after a minute it appears in the Scheduled view.
+- A provider refusal that can only be discovered while sending (rejected recipient, revoked
+  access) is reported as a failed item in the Scheduled view, not in the composer. There is no
+  push notification for it.
+- If a worker dies in the middle of the provider call the item fails with `outcome_unknown`: the
+  message may or may not have been sent, and MailFlow does not retry it on its own.
+- Cancelling a scheduled message from the Scheduled view reopens its text in the composer, but
+  files uploaded with it are not restored (they are erased with the cancelled item) and must be
+  attached again. Undo right after sending keeps them.
+- A scheduled message that was started from a draft keeps that draft in Drafts until it is sent.
+- Scheduled times are absolute instants; presets are computed in the browser's time zone. There
+  is no per-user time-zone setting and no recurring sends. Snooze is not implemented.

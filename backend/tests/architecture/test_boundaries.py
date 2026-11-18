@@ -205,7 +205,7 @@ def test_celery_tasks_take_only_identifiers():
             for d in node.decorator_list
         ):
             names = [a.arg for a in node.args.args]
-            assert set(names) <= {"user_id", "account_id"}, (node.name, names)
+            assert set(names) <= {"user_id", "account_id", "outbox_id"}, (node.name, names)
 
 
 def test_mail_server_connections_are_opened_only_by_the_guarded_transport():

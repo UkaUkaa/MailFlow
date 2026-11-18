@@ -214,7 +214,7 @@ async def test_read_star_trash_restore_and_archive_reach_the_server(
 
 
 async def test_send_delivers_by_smtp_and_saves_a_copy_in_sent(
-    alice, greenmail, imap_registry, runner
+    alice, greenmail, imap_registry, runner, dispatcher, clock
 ):
     box, recipient, hidden = (
         greenmail.user(),
@@ -238,7 +238,11 @@ async def test_send_delivers_by_smtp_and_saves_a_copy_in_sent(
         files=[("files", ("notes.txt", b"attached notes", "text/plain"))],
         headers={"Idempotency-Key": uuid.uuid4().hex},
     )
-    assert response.status_code == 200, response.text
+    # The undo window is on by default: the message is accepted, then sent by the worker.
+    assert response.status_code == 202, response.text
+    assert response.json()["status"] == "undoable"
+    clock.advance(seconds=6)
+    assert await dispatcher.run(alice.user_id, uuid.UUID(response.json()["outbox_id"])) == "sent"
 
     for inbox in (recipient, hidden):
         assert inbox.uids("INBOX") == [1]
@@ -254,7 +258,8 @@ async def test_send_delivers_by_smtp_and_saves_a_copy_in_sent(
     assert len(box.uids("Sent")) == 1 and "\\Seen" in box.flags("Sent", 1)
     sent = await threads(alice, view="sent")
     assert [t["subject"] for t in sent] == ["Привіт from MailFlow"]
-    assert response.json()["thread_id"] == sent[0]["id"]
+    outbox = await alice.client.get(f"/api/v1/outbox/{response.json()['outbox_id']}")
+    assert outbox.json()["status"] == "sent"
     assert sent[0]["has_attachments"] is True
     # The following synchronization does not duplicate the copy.
     assert await runner.run(alice.user_id, account_id) == "ok"
