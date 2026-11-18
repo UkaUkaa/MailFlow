@@ -6,6 +6,8 @@
 - Remote images in emails are shown by default for new users. Existing users keep their saved
   choice; anyone can turn images off in Settings → Appearance (D41). Until settings load, the
   reader keeps remote images blocked.
+- The open mailbox list refreshes itself every 2 minutes, so mail brought in by the background
+  sync appears without reloading. Search results are not polled; hidden tabs do not poll.
 
 ### Fixed
 - **Send later failed with 422.** The browser stores the `mf_tz` cookie URL-encoded
