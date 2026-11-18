@@ -53,6 +53,8 @@ def test_escape_hatches_are_rejected_outside_the_test_environment(environment, s
         "app_base_url": "https://mail.example.com",
         "vault_keys": "k1:" + "A" * 43 + "=",
         "database_url": "postgresql+asyncpg://app:secret@db/mailflow",
+        "smtp_host": "smtp.example.com",
+        "smtp_starttls": True,
     }
     extra = production if environment == "production" else {}
     make_settings(environment=environment, **extra)  # valid without the switch

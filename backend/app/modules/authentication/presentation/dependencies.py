@@ -7,7 +7,7 @@ from functools import lru_cache
 from typing import Annotated, cast
 
 import httpx
-from fastapi import Depends, Request
+from fastapi import BackgroundTasks, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
@@ -74,12 +74,13 @@ def get_audit_log(request: Request) -> SqlAuditLog:
 AuditDep = Annotated[SqlAuditLog, Depends(get_audit_log)]
 
 
-def get_notifier(settings: SettingsDep) -> EmailAuthNotifier:
+def get_notifier(settings: SettingsDep, background: BackgroundTasks) -> EmailAuthNotifier:
     return EmailAuthNotifier(
         build_mailer(settings),
         base_url=settings.app_base_url,
         verification_hours=settings.verification_token_ttl_hours,
         reset_minutes=settings.password_reset_token_ttl_minutes,
+        defer=background.add_task,
     )
 
 

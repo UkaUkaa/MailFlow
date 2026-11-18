@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from urllib.parse import quote
 
 from app.core.logging import get_logger
 from app.infrastructure.mailer import Mailer
 
 logger = get_logger(__name__)
+
+# Runs a coroutine function after the HTTP response has been sent (FastAPI background tasks).
+Deferrer = Callable[[Callable[[], Awaitable[None]]], None]
 
 _TEXT = {
     "en": {
@@ -35,9 +39,16 @@ _TEXT = {
 
 class EmailAuthNotifier:
     def __init__(
-        self, mailer: Mailer, *, base_url: str, verification_hours: int, reset_minutes: int
+        self,
+        mailer: Mailer,
+        *,
+        base_url: str,
+        verification_hours: int,
+        reset_minutes: int,
+        defer: Deferrer | None = None,
     ) -> None:
         self._mailer = mailer
+        self._defer = defer
         self._base_url = base_url
         self._hours = verification_hours
         self._minutes = reset_minutes
@@ -45,13 +56,25 @@ class EmailAuthNotifier:
     def _link(self, locale: str, path: str, token: str) -> str:
         return f"{self._base_url}/{locale}/{path}?token={quote(token, safe='')}"
 
-    async def _send(self, *, to: str, subject: str, text: str) -> None:
+    async def _deliver(self, *, to: str, subject: str, text: str) -> None:
         # Delivery problems must not change the HTTP outcome (that would reveal which
         # addresses exist); the user can request a new message.
         try:
             await self._mailer.send(to=to, subject=subject, text=text)
         except Exception as exc:
             logger.error("auth_mail_failed", error=type(exc).__name__)
+
+    async def _send(self, *, to: str, subject: str, text: str) -> None:
+        if self._defer is None:
+            await self._deliver(to=to, subject=subject, text=text)
+            return
+
+        # A real SMTP round trip takes long enough to be measurable; sending after the
+        # response keeps registration and reset timing identical for known/unknown addresses.
+        async def job() -> None:
+            await self._deliver(to=to, subject=subject, text=text)
+
+        self._defer(job)
 
     async def send_verification(self, *, to: str, token: str, locale: str) -> None:
         text = _TEXT.get(locale, _TEXT["en"])

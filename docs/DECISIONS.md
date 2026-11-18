@@ -266,3 +266,11 @@ strength, an accent colour and the reader's text size.
   endpoint over verified TLS in exchange for the client secret and PKCE verifier, which OIDC
   Core 3.1.3.7 (6) accepts in place of signature validation; `iss`, `aud`, `exp` and `nonce`
   are checked.
+
+## D39 — System mail is sent after the response
+Verification and reset messages are handed to FastAPI background tasks instead of being sent
+inside the request. A real SMTP round trip (hundreds of milliseconds) would otherwise make
+`register` and `password/forgot` measurably slower for addresses that get mail, revealing which
+addresses exist. Celery was not used: the task would have to carry the address and the one-time
+token, and Celery arguments must hold only IDs. A process restart between the response and the
+send loses the message; the user can request a new one (resend is rate limited).
