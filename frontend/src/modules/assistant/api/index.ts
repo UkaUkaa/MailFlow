@@ -2,7 +2,15 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/infrastructure/api-client";
-import { assistantSchema, replyDraftSchema, type AiProvider, type Assistant } from "../types";
+import {
+  assistantSchema,
+  messageDraftSchema,
+  replyDraftSchema,
+  type AiProvider,
+  type Assistant,
+  type DraftTarget,
+  type MessageDraft,
+} from "../types";
 
 export const assistantKeys = { config: ["assistant"] as const };
 
@@ -48,5 +56,28 @@ export function useDraftReply() {
   return useMutation({
     mutationFn: ({ sourceMessageId, instruction }: { sourceMessageId: string; instruction: string }) =>
       draftReply(sourceMessageId, instruction),
+  });
+}
+
+/** Writes the body (and, for a new email without one, a subject) from the user's note. */
+export function draftMessage(target: Extract<DraftTarget, { kind: "message" }> & { accountId: string }, instruction: string) {
+  return api.post("/assistant/compose", messageDraftSchema, {
+    account_id: target.accountId,
+    instruction,
+    subject: target.subject,
+    recipient_email: target.recipient?.email ?? null,
+    recipient_name: target.recipient?.name ?? null,
+    forwarded_message_id: target.forwardedMessageId ?? null,
+  });
+}
+
+/** Replies and new emails behind one mutation; a reply's result carries no subject. */
+export function useDraft() {
+  return useMutation({
+    mutationFn: async ({ target, instruction }: { target: DraftTarget; instruction: string }): Promise<MessageDraft> => {
+      if (target.kind === "reply") return { ...(await draftReply(target.sourceMessageId, instruction)), subject: "" };
+      if (!target.accountId) throw new Error("no account");
+      return draftMessage({ ...target, accountId: target.accountId }, instruction);
+    },
   });
 }

@@ -2,7 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+- **Write with AI for new emails and forwards** (D45). The composer's AI button now works in every
+  mode: a short note becomes the full email, written as the chosen mailbox, in the note's
+  language; an empty subject is filled with a suggested one. `POST /assistant/compose`.
+
 ### Changed
+- The composer always shows which mailbox the email is sent from (mark, name and full address),
+  on phone, tablet and desktop, even with a single mailbox; with several it is a picker.
 - Remote images in emails are shown by default for new users. Existing users keep their saved
   choice; anyone can turn images off in Settings → Appearance (D41). Until settings load, the
   reader keeps remote images blocked.

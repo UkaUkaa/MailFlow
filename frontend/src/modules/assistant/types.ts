@@ -29,5 +29,21 @@ export const replyDraftSchema = z.object({
 });
 export type ReplyDraft = z.infer<typeof replyDraftSchema>;
 
+/** A new email or a forward's note: also a suggested subject when the email had none. */
+export const messageDraftSchema = replyDraftSchema.extend({ subject: z.string() });
+export type MessageDraft = z.infer<typeof messageDraftSchema>;
+
+/** What the AI writes from: the message being answered, or the email being composed. */
+export type DraftTarget =
+  | { kind: "reply"; sourceMessageId: string }
+  | {
+      kind: "message";
+      /** The mailbox it is sent from; null until the user picks one. */
+      accountId: string | null;
+      subject: string;
+      recipient: { email: string; name?: string | null } | null;
+      forwardedMessageId?: string | null;
+    };
+
 export const ASSISTANT_INSTRUCTION_MAX = 2000;
 export const API_KEY_MAX = 512;

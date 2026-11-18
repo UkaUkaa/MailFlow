@@ -5,7 +5,7 @@ import { ChevronDown, FileText, Maximize2, Minimize2, Paperclip, Send, Sparkles,
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { toast } from "sonner";
-import { accountLabel, useAccounts } from "@/modules/accounts";
+import { useAccounts } from "@/modules/accounts";
 import {
   AttachmentChip,
   AttachmentList,
@@ -13,12 +13,11 @@ import {
   MAX_ATTACHMENT_TOTAL_BYTES,
   type Attachment,
 } from "@/modules/attachments";
-import { AiReplyBar } from "@/modules/assistant";
+import { AiDraftBar, type DraftTarget, type MessageDraft } from "@/modules/assistant";
 import { SendLaterMenu } from "@/modules/outbox";
 import { TemplatePicker, type FilledTemplate } from "@/modules/templates";
 import { ResponsiveDialog } from "@/shared/components/layout/responsive-dialog";
 import { Button } from "@/shared/components/ui/button";
-import { NativeSelect } from "@/shared/components/ui/input";
 import { Tooltip } from "@/shared/components/ui/tooltip";
 import { useDebouncedCallback } from "@/shared/hooks/use-debounced-callback";
 import { useMediaQuery } from "@/shared/hooks/use-media-query";
@@ -30,6 +29,7 @@ import { useVisualViewportVars } from "../lib/use-visual-viewport";
 import { toServerLocalTime } from "@/shared/lib/user-time";
 import { sendErrorKey } from "../lib/send-errors";
 import type { ComposeSession, DraftRequest, SendResult } from "../types";
+import { FromField } from "./from-field";
 import { RecipientsInput } from "./recipients-input";
 import { EditorToolbar, RichTextArea, useRichTextEditor } from "@/shared/components/editor/rich-text-editor";
 
@@ -66,7 +66,6 @@ export function ComposerPanel({
   const panelRef = useRef<HTMLDivElement>(null);
   useVisualViewportVars(panelRef);
   const fileInputId = useId();
-  const fromId = useId();
   const subjectId = useId();
 
   // Docked vs. page is an interaction difference, so it is decided in script (the panel is
@@ -98,9 +97,18 @@ export function ComposerPanel({
   // Template menu or its "save as template" dialog: their keys also bubble to this panel.
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
-  // AI replies need the message being answered, so they are offered for replies only. Without
-  // the user's own AI key the bar explains how to connect one.
-  const canDraftWithAi = Boolean(session.sourceMessageId) && (session.mode === "reply" || session.mode === "reply_all");
+  // Replies are written from the conversation; new emails and forwards from the note, as the
+  // chosen mailbox. Without the user's own AI key the bar explains how to connect one.
+  const aiTarget: DraftTarget =
+    (session.mode === "reply" || session.mode === "reply_all") && session.sourceMessageId
+      ? { kind: "reply", sourceMessageId: session.sourceMessageId }
+      : {
+          kind: "message",
+          accountId,
+          subject,
+          recipient: to[0] ?? null,
+          forwardedMessageId: session.mode === "forward" ? session.sourceMessageId : null,
+        };
   /** The time chosen in "Send later" while the "no subject" question is open. */
   const pendingSendAt = useRef<Date | null>(null);
 
@@ -200,9 +208,13 @@ export function ComposerPanel({
     touch();
   };
 
-  /** The AI draft replaces the body as one editor step, so undo restores what was there. */
-  const insertDraft = (bodyHtml: string) => {
-    editor?.chain().setContent(bodyHtml, { emitUpdate: true }).focus("end").run();
+  /**
+   * The AI draft replaces the body as one editor step, so undo restores what was there. A
+   * suggested subject only fills an empty one.
+   */
+  const insertDraft = (draft: MessageDraft) => {
+    if (draft.subject && !subject.trim()) setSubject(draft.subject);
+    editor?.chain().setContent(draft.body_html, { emitUpdate: true }).focus("end").run();
     touch();
   };
 
@@ -344,7 +356,6 @@ export function ComposerPanel({
   const saveLabel =
     saveState === "saving" ? t("saving") : saveState === "saved" ? t("saved") : saveState === "error" ? t("saveError") : "";
   const sendShortcut = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ Enter" : "Ctrl Enter";
-  const chooseFrom = activeAccounts.length > 1 || !accountId;
 
   // Split button: send now, or open the "Send later" choices from the adjoining half.
   const sendButton = (
@@ -419,21 +430,20 @@ export function ComposerPanel({
     />
   );
 
-  const aiButton = (className?: string) =>
-    canDraftWithAi ? (
-      <Tooltip label={t("writeWithAi")}>
-        <Button
-          variant="ghost"
-          size="icon"
-          aria-label={t("writeWithAi")}
-          aria-pressed={aiOpen}
-          onClick={() => setAiOpen((open) => !open)}
-          className={cn(aiOpen && "bg-accent-soft text-accent", className)}
-        >
-          <Sparkles />
-        </Button>
-      </Tooltip>
-    ) : null;
+  const aiButton = (className?: string) => (
+    <Tooltip label={t("writeWithAi")}>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label={t("writeWithAi")}
+        aria-pressed={aiOpen}
+        onClick={() => setAiOpen((open) => !open)}
+        className={cn(aiOpen && "bg-accent-soft text-accent", className)}
+      >
+        <Sparkles />
+      </Button>
+    </Tooltip>
+  );
 
   const discardButton = (className?: string) => (
     <Tooltip label={t("discard")}>
@@ -449,18 +459,8 @@ export function ComposerPanel({
     </Tooltip>
   );
 
-  const fromOptions = (
-    <>
-      {!accountId ? <option value="">{t("chooseAccount")}</option> : null}
-      {activeAccounts.map((account) => (
-        <option key={account.id} value={account.id}>
-          {account.display_name ? `${accountLabel(account)} <${account.email_address}>` : account.email_address}
-        </option>
-      ))}
-    </>
-  );
-  const onFromChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    setAccountId(event.target.value || null);
+  const onFromChange = (next: string | null) => {
+    setAccountId(next);
     touch();
   };
 
@@ -537,37 +537,13 @@ export function ComposerPanel({
             {templateButton("max-md:hidden")}
             {attachButton("max-md:hidden")}
             {discardButton("max-md:hidden")}
-            {chooseFrom ? (
-              <NativeSelect
-                aria-label={t("from")}
-                value={accountId ?? ""}
-                onChange={onFromChange}
-                className="w-auto max-w-[16rem] border-transparent bg-transparent text-foreground-muted hover:border-transparent max-md:hidden"
-              >
-                {fromOptions}
-              </NativeSelect>
-            ) : null}
             {sendButton}
           </header>
         )}
 
         <div className="scrollbar-thin min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
           <div className={cn("w-full min-w-0", docked ? "px-4 pb-3" : "px-4 pt-1 pb-4 md:max-w-[44rem] md:px-8 md:pt-6 lg:max-w-[750px] lg:pl-[78px]")}>
-            {chooseFrom ? (
-              <div className={cn("flex min-w-0 items-center gap-2", !docked && "md:hidden")}>
-                <label htmlFor={fromId} className="w-11 shrink-0 text-sm text-foreground-subtle">
-                  {t("from")}
-                </label>
-                <NativeSelect
-                  id={fromId}
-                  value={accountId ?? ""}
-                  onChange={onFromChange}
-                  className="min-w-0 flex-1 border-transparent bg-transparent px-0 hover:border-transparent"
-                >
-                  {fromOptions}
-                </NativeSelect>
-              </div>
-            ) : null}
+            {accounts.data ? <FromField accounts={activeAccounts} accountId={accountId} onChange={onFromChange} /> : null}
             {!draftsSupported ? (
               <p role="note" className="mb-2 rounded-md bg-muted px-3 py-2 text-[13px] break-words text-foreground-muted">
                 {t("draftsUnavailable")}
@@ -613,9 +589,9 @@ export function ComposerPanel({
               ) : null}
             </div>
 
-            {aiOpen && canDraftWithAi && session.sourceMessageId ? (
+            {aiOpen ? (
               <div className="pt-3">
-                <AiReplyBar sourceMessageId={session.sourceMessageId} onDraft={insertDraft} onClose={() => setAiOpen(false)} />
+                <AiDraftBar target={aiTarget} onDraft={insertDraft} onClose={() => setAiOpen(false)} />
               </div>
             ) : null}
 

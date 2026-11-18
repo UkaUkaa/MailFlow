@@ -67,6 +67,14 @@ def default_model(provider: AiProvider, models: tuple[str, ...]) -> str:
     return models[0]
 
 
+MAX_SUBJECT_LENGTH = 998
+
+
+def clean_subject(value: str) -> str:
+    """A suggested subject as one plain line, never longer than a header allows."""
+    return clip(" ".join(value.split()), MAX_SUBJECT_LENGTH)
+
+
 _LANGUAGE = re.compile(r"^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$")
 
 # Lines that start the quoted earlier message in a reply, in the clients and languages our
@@ -92,6 +100,14 @@ class ThreadEntry:
     text: str
 
 
+class DraftKind(StrEnum):
+    """What the model writes: a reply in a conversation, a new email, or a forward's cover note."""
+
+    REPLY = "reply"
+    NEW = "new"
+    FORWARD = "forward"
+
+
 @dataclass(frozen=True, slots=True)
 class ReplyRequest:
     instruction: str
@@ -103,12 +119,14 @@ class ReplyRequest:
     thread: tuple[ThreadEntry, ...]
     omitted_messages: int
     style_samples: tuple[str, ...]
+    kind: DraftKind = DraftKind.REPLY
 
 
 @dataclass(frozen=True, slots=True)
 class ReplyDraft:
     language: str
     body: str
+    subject: str = ""
 
 
 def strip_quoted(text: str) -> str:

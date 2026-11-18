@@ -43,7 +43,7 @@ Update this file whenever an item changes state.
       against PostgreSQL, UI with the mocked API
 - [~] AI replies with the user's own key (D43): OpenAI, Anthropic, Gemini; key in the Token Vault,
       context from the thread and sent mail, language detection; tested with fakes and mocked HTTP,
-      **not yet against the live provider APIs**
+      **not yet against the live provider APIs**; new emails and forward notes too (D45)
 - [x] Account deletion and deactivation
 
 ## Phase 6 — Responsive frontend
