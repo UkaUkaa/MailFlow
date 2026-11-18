@@ -42,6 +42,23 @@ export function formatFullDate(iso: string, locale: string): string {
   return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
+/**
+ * A moment a send is scheduled for, in the browser's time zone: weekday, day, month and time;
+ * the year only when it is not the current one.
+ */
+export function formatScheduleDate(value: Date | string, locale: string, now: Date = new Date()): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 export function initials(nameOrEmail: string): string {
   const trimmed = nameOrEmail.trim();
   if (!trimmed) return "?";

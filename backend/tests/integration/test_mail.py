@@ -11,7 +11,7 @@ from app.integrations.email_providers.contracts import (
     ProviderUnavailable,
     ThreadAction,
 )
-from tests.conftest import connect_mailbox
+from tests.conftest import connect_mailbox, set_undo_send
 from tests.fakes import make_message
 
 R = FolderRole
@@ -20,6 +20,8 @@ R = FolderRole
 async def _setup(actor, registry, runner, email="a@example.org"):
     account_id = await connect_mailbox(actor, registry, email)
     mailbox = registry.mailbox(email)
+    # These tests cover the immediate send path; the undo window is covered in test_outbox.
+    await set_undo_send(actor, 0)
     mailbox.add(make_message("in1", subject="Quarterly report", minutes=1), record=False)
     mailbox.add(
         make_message("in2", subject="Lunch plans", minutes=2, is_read=True,
@@ -311,6 +313,7 @@ async def test_reply_threads_and_sets_headers(alice, registry, runner):
 
 async def test_forward_includes_original_attachments_and_uploads(alice, registry, runner):
     account_id = await connect_mailbox(alice, registry, "a@example.org")
+    await set_undo_send(alice, 0)
     mailbox = registry.mailbox("a@example.org")
     mailbox.add(
         make_message(

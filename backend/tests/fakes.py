@@ -330,6 +330,27 @@ class RecordingQueue:
         self.items.append((user_id, account_id))
 
 
+class RecordingOutboxQueue:
+    def __init__(self) -> None:
+        self.enqueued: list[tuple[uuid.UUID, uuid.UUID, int]] = []
+
+    def enqueue(self, user_id: uuid.UUID, outbox_id: uuid.UUID, *, countdown: int = 0) -> None:
+        self.enqueued.append((user_id, outbox_id, countdown))
+
+
+class FakeClock:
+    """A clock tests can move forward; starts at the real time."""
+
+    def __init__(self) -> None:
+        self.offset = timedelta(0)
+
+    def now(self) -> datetime:
+        return datetime.now(UTC) + self.offset
+
+    def advance(self, **delta: float) -> None:
+        self.offset += timedelta(**delta)
+
+
 class CapturingNotifier:
     def __init__(self) -> None:
         self.verifications: dict[str, str] = {}

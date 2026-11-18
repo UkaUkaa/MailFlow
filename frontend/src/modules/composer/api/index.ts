@@ -1,11 +1,8 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
 import { api } from "@/infrastructure/api-client";
-import { draftSchema, type DraftRequest, type SendRequest } from "../types";
-
-const sentSchema = z.object({ message_id: z.string(), thread_id: z.string().nullable().optional() });
+import { draftSchema, sendResultSchema, type DraftRequest, type SendRequest } from "../types";
 
 export function createDraft(body: DraftRequest) {
   return api.post("/emails/drafts", draftSchema, body);
@@ -25,13 +22,14 @@ export function deleteDraft(draftId: string) {
 
 /**
  * Sends a message. `idempotencyKey` is fixed for the lifetime of one compose
- * session, so a retried or double-clicked send can never deliver twice.
+ * session, so a retried or double-clicked send can never deliver twice. With `send_at` in the
+ * payload the message is scheduled; otherwise it is sent now or held for the undo window.
  */
 export function sendEmail(payload: SendRequest, files: File[], idempotencyKey: string) {
   const form = new FormData();
   form.set("payload", JSON.stringify(payload));
   for (const file of files) form.append("files", file, file.name);
-  return api.post("/emails/send", sentSchema, form, { headers: { "Idempotency-Key": idempotencyKey } });
+  return api.post("/emails/send", sendResultSchema, form, { headers: { "Idempotency-Key": idempotencyKey } });
 }
 
 /** Deletes a stored draft and refreshes the lists and conversations that showed it. */

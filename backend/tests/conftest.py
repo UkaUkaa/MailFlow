@@ -17,16 +17,25 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 from app.bootstrap import Runtime, Services
 from app.core.config import Settings
 from app.core.database.engine import tenant_transaction
-from app.infrastructure.celery.tasks import build_runner
+from app.infrastructure.celery.tasks import build_dispatcher, build_runner
 from app.main import create_app
 from app.modules.authentication.presentation.dependencies import get_notifier
+from app.modules.outbox.application import OutboxDispatcher
 from app.modules.synchronization.application import SyncPolicy, SyncRunner
-from tests.fakes import CapturingNotifier, FakeRegistry, RecordingQueue
+from tests.fakes import (
+    CapturingNotifier,
+    FakeClock,
+    FakeRegistry,
+    RecordingOutboxQueue,
+    RecordingQueue,
+)
 from tests.imap_support import GreenMail, ImapTestRegistry
 
 PG = os.environ.get("TEST_PG", "127.0.0.1:54329")
-OWNER_URL = f"postgresql+asyncpg://mailflow_owner:dev_owner_password@{PG}/mailflow_test"
-APP_URL = f"postgresql+asyncpg://mailflow_app:dev_app_password@{PG}/mailflow_test"
+# Override to run against a private database when several checkouts share one Postgres.
+PG_DB = os.environ.get("TEST_PG_DB", "mailflow_test")
+OWNER_URL = f"postgresql+asyncpg://mailflow_owner:dev_owner_password@{PG}/{PG_DB}"
+APP_URL = f"postgresql+asyncpg://mailflow_app:dev_app_password@{PG}/{PG_DB}"
 REDIS_URL = os.environ.get("TEST_REDIS_URL", "redis://127.0.0.1:63799/15")
 PASSWORD = "correct horse battery"
 
@@ -78,7 +87,9 @@ async def runtime(settings: Settings, owner_engine: AsyncEngine) -> AsyncIterato
         )
         names = ", ".join(row[0] for row in tables)
         await conn.execute(text(f"TRUNCATE {names} CASCADE"))
-    rt = Runtime.create(settings, sync_queue=RecordingQueue())
+    rt = Runtime.create(
+        settings, sync_queue=RecordingQueue(), outbox_queue=RecordingOutboxQueue()
+    )
     rt.registry = FakeRegistry()
     await rt.redis.flushdb()
     yield rt
@@ -235,6 +246,30 @@ def sync_policy() -> SyncPolicy:
 @pytest.fixture
 def runner(runtime: Runtime, sync_policy: SyncPolicy) -> SyncRunner:
     return build_runner(runtime, sync_policy)
+
+
+@pytest.fixture
+def clock(runtime: Runtime) -> FakeClock:
+    """Replace the runtime clock (use cases and workers; not session expiry) with a movable one."""
+    fake = FakeClock()
+    runtime.clock = fake
+    return fake
+
+
+@pytest.fixture
+def outbox_queue(runtime: Runtime) -> RecordingOutboxQueue:
+    assert isinstance(runtime.outbox_queue, RecordingOutboxQueue)
+    return runtime.outbox_queue
+
+
+@pytest.fixture
+def dispatcher(runtime: Runtime, clock: FakeClock) -> OutboxDispatcher:
+    return build_dispatcher(runtime)
+
+
+async def set_undo_send(actor: Actor, seconds: int) -> None:
+    response = await actor.client.patch("/api/v1/settings", json={"undo_send_seconds": seconds})
+    assert response.status_code == 200, response.text
 
 
 @pytest.fixture

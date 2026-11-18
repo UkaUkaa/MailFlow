@@ -22,7 +22,8 @@ cd backend && uv run pytest --cov=app --cov-report=term-missing
 cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy app
 ```
 
-Tests use the `mailflow_test` database: migrations are applied as the owner role and the tests
+Tests use the `mailflow_test` database (`TEST_PG_DB` selects another one, e.g. when several
+checkouts with different migrations share the dev Postgres): migrations are applied as the owner role and the tests
 connect as the restricted `mailflow_app` role, so row-level security is really in force. External
 APIs are never called: the Gmail adapter is tested with `respx`, flows with an in-memory provider.
 The IMAP adapter is the exception that talks to a real server — the local `greenmail` container —

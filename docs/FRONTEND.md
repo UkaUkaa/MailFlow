@@ -158,6 +158,31 @@ drafts endpoints 1.5 s after the last change (saves are serialized) and when the
 closed; attachments stay in the browser until send. The quoted original is kept outside the
 editor (so its markup survives) and appended to `body_html` on save and send.
 
+### Send later, undo send, Scheduled view (D42)
+
+Module `src/modules/outbox` (types, `/outbox` API hooks under the `["outbox"]` query key,
+`lib/schedule-presets.ts`, `SendLaterMenu`, `ScheduledList`, the rail item with its count).
+- **Send later**: the chevron next to Send ("Schedule for later") opens the presets — later today
+  18:00, tomorrow 08:00, Monday 08:00, or an exact date and time — computed in the browser's
+  time zone by a pure function. A bottom sheet on phones, a menu (plus a dialog for the exact
+  time) from 768px. The chosen moment is sent as `send_at` in local
+  wall-clock time; the server converts it using the `mf_tz` cookie.
+  `src/shared/lib/user-time.ts` writes that cookie from the device's time zone, and
+  `UserTimeSync` (root providers) refreshes it on load and prints the user's time to the console
+  (`[MailFlow] User time: … (Europe/Kyiv, UTC+02:00)`).
+- **After a send** the composer closes and `useSendOutcome` (composer/hooks) takes over: `sent`
+  announces it; `undoable` shows "Sending…" with a countdown bar and **Undo** for the window the
+  server reports; `scheduled` shows the time with Undo for 8 s. Undo cancels the outbox item and
+  reopens the composer from the in-memory session — recipients, body, quote, picked files — with
+  a **new** idempotency key (the old key answers `409 send_cancelled`). A reopened composer is
+  treated as unsaved, so closing it saves a draft.
+- **Scheduled view**: `/mail/scheduled` (the `[view]` segment) renders `ScheduledList` in the list
+  pane; it refetches every 30 s and on focus. Each row has always-visible Reschedule (Retry for a
+  failed item) and Cancel send; cancelling reopens the content in the composer.
+- **Setting**: "Undo send" (Off / 5 / 10 / 20 / 30 s) in Settings → Appearance and language.
+- The e2e mock API defaults to `undo_send_seconds: 0` so specs written for an immediate send
+  stay valid; `e2e/scheduled.spec.ts` turns the window on.
+
 ## IMAP/SMTP mailboxes
 
 Settings → Connected accounts offers "Connect another mail account (IMAP)" when

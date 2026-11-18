@@ -24,13 +24,32 @@ vi.mock("@/modules/composer", () => ({ useComposer: () => ({ compose, reply: vi.
 vi.mock("@/infrastructure/theme", () => ({ useTheme: () => ({ theme: "system", resolvedTheme: "light", setTheme: vi.fn() }) }));
 
 const fetchMock = vi.fn<typeof fetch>();
+let scheduled: Record<string, unknown>[];
+const scheduledSend = (id: string, accountId: string) => ({
+  id,
+  account_id: accountId,
+  status: "pending",
+  send_at: "2099-01-01T08:00:00Z",
+  created_at: "2026-11-18T09:00:00Z",
+  subject: "Later",
+  to: [],
+  cc: [],
+  bcc: [],
+  snippet: "",
+  attachment_count: 0,
+  mode: "new",
+  error_code: null,
+});
 
 beforeEach(() => {
   compose.mockReset();
+  scheduled = [];
   fetchMock.mockReset();
   fetchMock.mockImplementation(async (input) => {
     const url = String(input);
-    const items = url.startsWith("/api/v1/accounts")
+    const items = url.startsWith("/api/v1/outbox")
+      ? scheduled
+      : url.startsWith("/api/v1/accounts")
       ? [makeAccount("acc-1", {}, { display_name: "Personal" })]
       : url.startsWith("/api/v1/folders/counts")
         ? [{ role: "inbox", unread_count: 3 }]
@@ -75,6 +94,7 @@ describe("Navigation column", () => {
       "Inbox, 3 unread",
       "Starred",
       "Sent",
+      "Scheduled",
       "Drafts",
       "Archive",
       "Trash",
@@ -130,6 +150,14 @@ describe("Navigation column", () => {
     await user.hover(settings);
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+  });
+
+  it("counts the scheduled sends on the Scheduled row", async () => {
+    scheduled = [scheduledSend("out-1", "acc-1"), scheduledSend("out-2", "acc-2")];
+    renderNavigation();
+    const row = await screen.findByRole("link", { name: "Scheduled, 2 messages" });
+    expect(row).toHaveAttribute("href", "/mail/scheduled");
+    expect(row).toHaveTextContent("Scheduled2");
   });
 
   it("composes from its row", async () => {

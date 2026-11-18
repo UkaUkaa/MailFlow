@@ -45,6 +45,9 @@ class UserSettingsModel(Base):
     reader_text_size: Mapped[str] = mapped_column(
         String(16), nullable=False, default="default", server_default="default"
     )
+    undo_send_seconds: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=5, server_default=text("5")
+    )
     updated_at: Mapped[datetime] = updated_at_column()
 
 

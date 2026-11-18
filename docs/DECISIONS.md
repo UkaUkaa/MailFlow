@@ -294,3 +294,45 @@ sanitized and rendered in the sandboxed iframe under CSP; only image loading is 
 is privacy: senders can see when and from which IP a message is opened (tracking pixels). Users
 who want the old behaviour turn off "Always show remote images" in Appearance; the per-message
 "Show images" button returns for them.
+
+## D42 — Send later and undo send share one scheduled outbox
+Both features are the same thing at different delays, so there is one mechanism: `POST
+/emails/send` either sends now or stores the composed message in `outbox_items` (module `outbox`)
+with a `send_at`. "Send later" is a time the user picked; "undo send" is `now +
+undo_send_seconds` (setting: off/5/10/20/30 s, default 5, also for existing users). Undo is a
+plain cancel of a pending item, so it is a server-side guarantee, not a client-side timer that a
+closed tab would defeat. Approved as an addition to the MVP scope.
+
+- **Storage.** The outbox row holds the message itself (sanitized body, recipients, uploaded
+  files in `outbox_attachments`), not a reference to a provider draft: IMAP mailboxes may have no
+  Drafts folder and drafts do not carry attachments. Both tables have `user_id`, the composite
+  account foreign key and the tenant RLS policy. Content is erased when an item is sent or
+  cancelled; the row stays 30 days as an idempotency tombstone.
+- **Dispatch.** A send due within a minute is handed to a worker directly (`outbox.send` with a
+  countdown), so a 5 s undo window is 5 s, not "up to the next scan". Everything else is found by
+  the beat task `outbox.dispatch_due` (every 10 s) through the SECURITY DEFINER function
+  `mailflow_claim_due_outbox`, which selects due rows `FOR UPDATE SKIP LOCKED`, leases them
+  (`enqueued_until`) and returns ids only. Tasks carry `(user_id, outbox_id)`.
+- **Exactly one send.** The worker claims the item inside the owner's tenant transaction with a
+  single `UPDATE ... WHERE status = 'pending' AND next_attempt_at <= now` (`pending → sending`),
+  commits, then sends through `ComposeService.send` with the item's idempotency key. A second
+  worker loses the claim; a worker that died after the provider accepted the message is replaced
+  after its lease and gets the stored result from the idempotency store instead of sending again.
+  If a worker died mid-send the outcome cannot be known: the item fails with `outcome_unknown`
+  rather than risk a duplicate. Cancel and claim race on the same row, so exactly one wins.
+- **Re-checks in the worker.** Owner active, account owned and active, credentials from the Token
+  Vault — all inside the compose path the API uses. Provider outages are retried three times with
+  backoff (`next_attempt_at`; `send_at` shown to the user does not move); other errors fail the
+  item, which then shows in the Scheduled view with retry (reschedule) and cancel.
+- **User time.** The user picks a time on their own clock. The browser stores the device's IANA
+  time zone in the `mf_tz` cookie (not HttpOnly, `SameSite=Lax`, refreshed on every load and
+  before every scheduled send, so it follows where the person is) and sends the picked moment
+  as local wall-clock time; the server validates the zone against the IANA database and converts
+  to UTC, which is all it stores. The cookie only interprets the caller's own input, so a forged
+  value can do no more than shift the caller's own send time. A wall time that occurs twice when
+  clocks go back means its first occurrence. On load the page prints the user's time, zone and
+  offset to the browser console.
+- **Cost.** With undo on, sending depends on a running worker and beat; a queued message is
+  rejected up front for everything that can be checked without the provider, but a provider
+  refusal is reported in the Scheduled view rather than in the composer. Migration 0001 now
+  carries its own frozen list of tenant tables so later migrations can add to `TENANT_TABLES`.

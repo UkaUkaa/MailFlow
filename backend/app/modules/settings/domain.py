@@ -11,6 +11,8 @@ PREVIEW_LINES = (0, 1, 2)
 ACCOUNT_TINTS = ("off", "subtle", "strong")
 ACCENT_COLORS = ("blue", "violet", "green", "orange", "pink", "graphite")
 READER_TEXT_SIZES = ("small", "default", "large")
+# Undo send: how long a sent message waits in the outbox before it really goes out. 0 = off.
+UNDO_SEND_SECONDS = (0, 5, 10, 20, 30)
 
 # Allowed values per enumerated field, used for validation in the application layer.
 CHOICES: dict[str, tuple[object, ...]] = {
@@ -21,6 +23,7 @@ CHOICES: dict[str, tuple[object, ...]] = {
     "account_tint": ACCOUNT_TINTS,
     "accent_color": ACCENT_COLORS,
     "reader_text_size": READER_TEXT_SIZES,
+    "undo_send_seconds": UNDO_SEND_SECONDS,
 }
 
 
@@ -36,3 +39,4 @@ class UserSettings:
     account_tint: str = "subtle"
     accent_color: str = "blue"
     reader_text_size: str = "default"
+    undo_send_seconds: int = 5

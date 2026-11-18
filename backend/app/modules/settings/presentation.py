@@ -25,6 +25,7 @@ class SettingsResponse(BaseModel):
     account_tint: Literal["off", "subtle", "strong"]
     accent_color: Literal["blue", "violet", "green", "orange", "pink", "graphite"]
     reader_text_size: Literal["small", "default", "large"]
+    undo_send_seconds: Literal[0, 5, 10, 20, 30]
 
 
 class SettingsUpdate(BaseModel):
@@ -39,6 +40,7 @@ class SettingsUpdate(BaseModel):
     account_tint: Literal["off", "subtle", "strong"] | None = None
     accent_color: Literal["blue", "violet", "green", "orange", "pink", "graphite"] | None = None
     reader_text_size: Literal["small", "default", "large"] | None = None
+    undo_send_seconds: Literal[0, 5, 10, 20, 30] | None = None
 
 
 @router.get("", response_model=SettingsResponse)

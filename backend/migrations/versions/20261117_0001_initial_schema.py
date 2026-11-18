@@ -8,7 +8,19 @@ import os
 from alembic import op
 import sqlalchemy as sa
 
-from app.core.database.base import TENANT_TABLES
+# Frozen: the tenant tables that exist at this revision. Later migrations enable RLS on the
+# tables they add (the live list is ``app.core.database.base.TENANT_TABLES``).
+TENANT_TABLES = (
+    "user_settings",
+    "email_accounts",
+    "account_credentials",
+    "oauth_states",
+    "sync_states",
+    "email_folders",
+    "email_threads",
+    "email_messages",
+    "attachments",
+)
 from sqlalchemy.dialects import postgresql
 
 revision = '0001'

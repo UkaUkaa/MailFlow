@@ -2,7 +2,9 @@
 
 import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
+import { useComposer } from "@/modules/composer";
 import { ReaderPlaceholder } from "@/modules/emails";
+import { SCHEDULED_VIEW, ScheduledList } from "@/modules/outbox";
 import { cn } from "@/shared/lib/cn";
 import { lastMailList, rememberMailLocation } from "@/shared/lib/mail-location";
 import { ThreadList } from "./thread-list";
@@ -18,7 +20,10 @@ const listPane = "min-h-0 min-w-0 flex-col split:flex split:w-[348px] split:shri
 export function MailWorkspace({ children }: { children: ReactNode }) {
   const params = useParams<{ view: string; threadId?: string }>();
   const searchParams = useSearchParams();
-  const threadOpen = Boolean(params.threadId);
+  const composer = useComposer();
+  // Scheduled sends have no reader of their own: the list is the whole view.
+  const scheduled = params.view === SCHEDULED_VIEW;
+  const threadOpen = Boolean(params.threadId) && !scheduled;
 
   useEffect(() => {
     rememberMailLocation(params.view, params.threadId, new URLSearchParams(searchParams.toString()));
@@ -27,9 +32,11 @@ export function MailWorkspace({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
       <div className={cn(listPane, threadOpen ? "hidden" : "flex w-full")}>
-        <ThreadList />
+        {scheduled ? <ScheduledList onReopen={composer.reopenCancelled} /> : <ThreadList />}
       </div>
-      <div className={cn("min-h-0 min-w-0 flex-1 flex-col split:flex", threadOpen ? "flex" : "hidden")}>{children}</div>
+      <div className={cn("min-h-0 min-w-0 flex-1 flex-col split:flex", threadOpen ? "flex" : "hidden")}>
+        {scheduled ? <ReaderPlaceholder /> : children}
+      </div>
     </div>
   );
 }
@@ -39,10 +46,15 @@ export function MailWorkspace({ children }: { children: ReactNode }) {
  * reading pane. Rendered, inert, behind a surface that covers the app (the settings dialog).
  */
 export function MailBackdrop() {
+  const scope = lastMailList();
   return (
     <div className="flex min-h-0 min-w-0 flex-1">
       <div className={cn(listPane, "flex w-full")}>
-        <ThreadList scope={lastMailList()} />
+        {scope.view === SCHEDULED_VIEW ? (
+          <ScheduledList accountId={scope.accountId} onReopen={() => undefined} />
+        ) : (
+          <ThreadList scope={scope} />
+        )}
       </div>
       <div className="hidden min-h-0 min-w-0 flex-1 flex-col split:flex">
         <ReaderPlaceholder />

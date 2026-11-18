@@ -79,7 +79,8 @@ connected separately under `/accounts`). `next` must be a same-origin path, othe
 | GET | `/settings` | — | `Settings` |
 | PATCH | `/settings` | partial `Settings` | `Settings` |
 
-`Settings`: `{locale:"en"|"uk", theme:"system"|"light"|"dark", load_remote_images:boolean, conversation_view:boolean, list_density:"comfortable"|"compact", list_preview_lines:0|1|2, show_avatars:boolean, account_tint:"off"|"subtle"|"strong", accent_color:"blue"|"violet"|"green"|"orange"|"pink"|"graphite", reader_text_size:"small"|"default"|"large"}`. Any other value is a 422.
+`Settings`: `{locale:"en"|"uk", theme:"system"|"light"|"dark", load_remote_images:boolean, conversation_view:boolean, list_density:"comfortable"|"compact", list_preview_lines:0|1|2, show_avatars:boolean, account_tint:"off"|"subtle"|"strong", accent_color:"blue"|"violet"|"green"|"orange"|"pink"|"graphite", reader_text_size:"small"|"default"|"large", undo_send_seconds:0|5|10|20|30}`. Any other value is a 422.
+`undo_send_seconds` is the undo-send window (default 5, `0` = off); see Outbox.
 
 ## Accounts — `/accounts`
 
@@ -179,7 +180,7 @@ The password is never returned by any endpoint, and server settings are not echo
 |---|---|---|
 | GET | `/emails/{id}` | `Message` |
 | POST | `/emails/{id}/actions` | `{action}` (`mark_read`, `mark_unread`, `star`, `unstar`) → `Message` |
-| POST | `/emails/send` | `multipart/form-data`: field `payload` (JSON `SendRequest`) + repeated `files`. Header `Idempotency-Key` required. → `200 {message_id, thread_id}` |
+| POST | `/emails/send` | `multipart/form-data`: field `payload` (JSON `SendRequest`) + repeated `files`. Header `Idempotency-Key` required. → `SendResponse`: `200` when sent now, `202` when held for the undo window or scheduled (see Outbox) |
 | POST | `/emails/drafts` | `DraftRequest` → `201 Draft` |
 | GET | `/emails/drafts/{id}` | `Draft` |
 | PUT | `/emails/drafts/{id}` | `DraftRequest` → `Draft` |
@@ -188,11 +189,48 @@ The password is never returned by any endpoint, and server settings are not echo
 `Message`: `{id, thread_id, account_id, from:Address, to:[Address], cc:[Address], bcc:[Address], reply_to:[Address], subject, snippet, sent_at, is_read, is_starred, is_draft, body_html, body_text, has_remote_images, attachments:[Attachment]}`.
 `body_html` is already sanitized server-side; the client still renders it in a sandboxed iframe.
 
-`SendRequest`: `{account_id, to:[Address], cc:[Address], bcc:[Address], subject, body_html, mode:"new"|"reply"|"reply_all"|"forward", source_message_id?, draft_id?, forward_attachment_ids?:[id]}`.
+`SendRequest`: `{account_id, to:[Address], cc:[Address], bcc:[Address], subject, body_html, mode:"new"|"reply"|"reply_all"|"forward", source_message_id?, draft_id?, forward_attachment_ids?:[id], send_at?}`.
+`send_at` schedules the message; it must be in the future and at most a year ahead (`422` with
+`{field:"send_at", code:"in_past"|"too_far"}`). It is either ISO-8601 with a UTC offset, or the
+user's local wall-clock time without one (`2026-12-18T09:00:00`), which the server reads in the
+IANA time zone of the `mf_tz` cookie and converts to UTC. Local time without a valid cookie is a
+`422` with code `timezone_required`. The same applies to `PATCH /outbox/{id}`. Responses always
+carry UTC.
+`SendResponse`: `{status:"sent"|"undoable"|"scheduled", message_id, thread_id, outbox_id, send_at, undo_seconds}`.
 `DraftRequest`: same fields without `forward_attachment_ids`; all recipients optional.
 `Draft`: `{id, account_id, thread_id, to, cc, bcc, subject, body_html, mode, source_message_id, updated_at}`.
 
 Limits: 25 MB total per message, 20 files.
+
+## Outbox — `/outbox`
+
+Send later and undo send share one server-side outbox (D42). `POST /emails/send` decides:
+
+| Request | Result |
+|---|---|
+| `send_at` given | `202`, `status:"scheduled"`, `outbox_id`, `send_at` |
+| no `send_at`, `undo_send_seconds` > 0 | `202`, `status:"undoable"`, `outbox_id`, `send_at` = now + window, `undo_seconds` |
+| no `send_at`, `undo_send_seconds` = 0 | `200`, `status:"sent"`, `message_id`, `thread_id` |
+
+The request is validated like a direct send before it is accepted (recipients, account, source
+message, draft, attachment limits, hourly send limit). Repeating a request with the same
+`Idempotency-Key` returns the first outcome and never queues or sends twice; after the item was
+cancelled it is a `409 send_cancelled`, so a reopened composer must use a new key. At most 100
+items may wait per user (`409 too_many_scheduled`).
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/outbox` | `{items:[OutboxItem]}` ascending by `send_at`: scheduled items waiting or being sent, every failed item, and undo-window items more than a minute overdue |
+| GET | `/outbox/{id}` | `OutboxDetail` |
+| PATCH | `/outbox/{id}` | `{send_at}` → `OutboxItem`. Pending or failed items only (a failed item is queued again); otherwise `409 outbox_not_editable` |
+| POST | `/outbox/{id}/cancel` | → `OutboxDetail` with `status:"cancelled"` and the full content, so the composer can reopen it. Pending or failed items only; otherwise `409 outbox_not_cancellable` (too late: sending or sent) |
+
+`OutboxItem`: `{id, account_id, status:"pending"|"sending"|"sent"|"cancelled"|"failed", send_at, created_at, subject, to, cc, bcc, snippet, attachment_count, mode, error_code}`.
+`OutboxDetail`: `OutboxItem` + `{body_html, source_message_id, draft_id, forward_attachment_ids, attachments:[{filename, mime_type, size}]}`.
+`error_code` of a failed item is the error code of the failed send (`provider_auth_required`,
+`provider_unavailable`, `not_found`, …) or `outcome_unknown` when a worker died mid-send and the
+message may or may not have gone out. Body and uploaded attachments are erased from the outbox
+once an item is sent or cancelled. Another user's item is a `404`.
 
 ## Attachments — `/attachments`
 

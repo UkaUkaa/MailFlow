@@ -10,7 +10,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from functools import cached_property
 from typing import Protocol
@@ -54,6 +54,8 @@ from app.modules.emails.infrastructure.repositories import SqlMailRepository
 from app.modules.emails.infrastructure.sanitizer import Nh3HtmlSanitizer
 from app.modules.folders.application import FolderService
 from app.modules.folders.infrastructure import SqlFolderRepository
+from app.modules.outbox.application import OutboxQueue, OutboxService
+from app.modules.outbox.infrastructure import SqlOutboxRepository
 from app.modules.settings.application import SettingsService
 from app.modules.settings.infrastructure import SqlSettingsRepository
 from app.modules.synchronization.application import SyncQueue, SyncRequestService
@@ -83,6 +85,13 @@ class _NullQueue:
         return None
 
 
+class _NullOutboxQueue:
+    """No direct hand-off: due items are found by the beat scan alone."""
+
+    def enqueue(self, user_id: uuid.UUID, outbox_id: uuid.UUID, *, countdown: int = 0) -> None:
+        return None
+
+
 @dataclass
 class Runtime:
     """Process-wide singletons."""
@@ -96,10 +105,16 @@ class Runtime:
     cipher: Cipher
     sync_queue: SyncQueue
     clock: Clock
+    outbox_queue: OutboxQueue = field(default_factory=_NullOutboxQueue)
 
     @classmethod
     def create(
-        cls, settings: Settings, *, pooled: bool = True, sync_queue: SyncQueue | None = None
+        cls,
+        settings: Settings,
+        *,
+        pooled: bool = True,
+        sync_queue: SyncQueue | None = None,
+        outbox_queue: OutboxQueue | None = None,
     ) -> Runtime:
         engine = create_engine(settings, pooled=pooled)
         http = build_provider_http_client(settings)
@@ -113,6 +128,7 @@ class Runtime:
             cipher=build_cipher(settings),
             sync_queue=sync_queue or _NullQueue(),
             clock=SystemClock(),
+            outbox_queue=outbox_queue or _NullOutboxQueue(),
         )
 
     async def close(self) -> None:
@@ -274,6 +290,21 @@ class Services:
     @cached_property
     def settings(self) -> SettingsService:
         return SettingsService(SqlSettingsRepository(self._db))
+
+    @cached_property
+    def outbox_repository(self) -> SqlOutboxRepository:
+        return SqlOutboxRepository(self._db)
+
+    @cached_property
+    def outbox(self) -> OutboxService:
+        return OutboxService(
+            self.outbox_repository,
+            self.compose,
+            self.settings,
+            self._rt.outbox_queue,
+            self.audit,
+            self._rt.clock,
+        )
 
     @property
     def registry(self) -> ProviderRegistry:

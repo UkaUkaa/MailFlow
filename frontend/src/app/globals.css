@@ -407,3 +407,20 @@
     }
   }
 }
+
+/* Countdown of the "Undo" toast: the bar empties over the undo window (duration set inline). */
+@keyframes undo-countdown {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+
+/* Toast actions ("Undo") are primary controls: finger-sized on touch screens. */
+@media (pointer: coarse), (max-width: 47.99rem) {
+  [data-sonner-toaster] [data-sonner-toast][data-styled="true"] [data-button] {
+    height: 2.75rem;
+    min-width: 2.75rem;
+    padding-inline: 0.875rem;
+    font-size: 0.875rem;
+    justify-content: center;
+  }
+}

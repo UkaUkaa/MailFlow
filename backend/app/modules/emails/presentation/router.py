@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import datetime
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, File, Form, Header, Query, UploadFile, status
+from fastapi import APIRouter, File, Form, Header, Query, Response, UploadFile, status
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from app.api.deps import Auth, Svc
@@ -19,6 +20,7 @@ from app.api.schemas import (
     message_out,
     thread_out,
 )
+from app.api.timezone import TimeZoneCookie, to_server_time
 from app.core.dependencies import SettingsDep
 from app.integrations.email_providers.contracts import SendMode, ThreadAction
 from app.modules.emails.application.compose import ComposeCommand, UploadedFile
@@ -74,6 +76,9 @@ class DraftRequest(BaseModel):
 class SendRequest(DraftRequest):
     draft_id: uuid.UUID | None = None
     forward_attachment_ids: list[uuid.UUID] = Field(default_factory=list, max_length=20)
+    # Send later: when to send, either with a UTC offset or as local wall-clock time that is
+    # read in the time zone of the ``mf_tz`` cookie. Without it the undo-send window applies.
+    send_at: datetime | None = None
 
     def to_command(self) -> ComposeCommand:
         base = super().to_command()
@@ -92,8 +97,14 @@ class SendRequest(DraftRequest):
 
 
 class SendResponse(BaseModel):
+    # "sent": delivered to the provider now. "undoable": held for the undo window.
+    # "scheduled": waiting for the time the user picked. The last two carry ``outbox_id``.
+    status: Literal["sent", "undoable", "scheduled"]
     message_id: uuid.UUID | None
     thread_id: uuid.UUID | None
+    outbox_id: uuid.UUID | None = None
+    send_at: datetime | None = None
+    undo_seconds: int = 0
 
 
 # -- threads -------------------------------------------------------------------------------
@@ -180,9 +191,11 @@ async def send_email(
     auth: Auth,
     svc: Svc,
     settings: SettingsDep,
+    response: Response,
     payload: Annotated[str, Form(max_length=1_200_000)],
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=128)],
     files: Annotated[list[UploadFile] | None, File()] = None,
+    time_zone: TimeZoneCookie = None,
 ) -> SendResponse:
     try:
         request = SendRequest.model_validate(json.loads(payload))
@@ -210,10 +223,24 @@ async def send_email(
                 content=content,
             )
         )
-    result = await svc.compose.send(
-        auth.user_id, request.to_command(), uploads, idempotency_key=idempotency_key
+    outcome = await svc.outbox.submit(
+        auth.user_id,
+        request.to_command(),
+        uploads,
+        idempotency_key=idempotency_key,
+        send_at=to_server_time(request.send_at, time_zone) if request.send_at else None,
     )
-    return SendResponse(message_id=result.message_id, thread_id=result.thread_id)
+    if outcome.status != "sent":
+        response.status_code = status.HTTP_202_ACCEPTED  # accepted, not yet sent
+    waiting = outcome.item is not None and outcome.status != "sent"
+    return SendResponse(
+        status=outcome.status,
+        message_id=outcome.message_id,
+        thread_id=outcome.thread_id,
+        outbox_id=outcome.item.id if outcome.item else None,
+        send_at=outcome.item.send_at if outcome.item and waiting else None,
+        undo_seconds=outcome.undo_seconds,
+    )
 
 
 # -- single messages -----------------------------------------------------------------------

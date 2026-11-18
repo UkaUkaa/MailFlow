@@ -26,6 +26,7 @@ from app.modules.authentication.presentation.router import router as auth_router
 from app.modules.email_accounts.presentation.router import router as accounts_router
 from app.modules.emails.presentation.router import emails_router, threads_router
 from app.modules.folders.presentation import router as folders_router
+from app.modules.outbox.presentation import router as outbox_router
 from app.modules.search.presentation import router as search_router
 from app.modules.settings.presentation import router as settings_router
 from app.modules.synchronization.presentation import router as sync_router
@@ -43,9 +44,11 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
         owned = runtime is None
         rt = runtime
         if rt is None:
-            from app.infrastructure.celery.queue import CelerySyncQueue
+            from app.infrastructure.celery.queue import CeleryOutboxQueue, CelerySyncQueue
 
-            rt = Runtime.create(settings, sync_queue=CelerySyncQueue())
+            rt = Runtime.create(
+                settings, sync_queue=CelerySyncQueue(), outbox_queue=CeleryOutboxQueue()
+            )
         app.state.runtime = rt
         app.state.session_factory = rt.session_factory
         app.state.redis = rt.redis
@@ -120,6 +123,7 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
         folders_router,
         threads_router,
         emails_router,
+        outbox_router,
         attachments_router,
         search_router,
     ):

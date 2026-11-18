@@ -25,6 +25,8 @@ celery_app.conf.update(
     task_routes={
         "sync.account": {"queue": "sync"},
         "sync.schedule_due": {"queue": "maintenance"},
+        "outbox.send": {"queue": "default"},
+        "outbox.dispatch_due": {"queue": "default"},
         "maintenance.cleanup": {"queue": "maintenance"},
     },
     broker_transport_options={"visibility_timeout": settings.sync_lock_ttl_seconds + 120},
@@ -33,6 +35,8 @@ celery_app.conf.update(
     enable_utc=True,
     beat_schedule={
         "schedule-due-syncs": {"task": "sync.schedule_due", "schedule": 30.0},
+        # Safety net for scheduled sends; sends due within a minute are enqueued directly.
+        "dispatch-due-outbox": {"task": "outbox.dispatch_due", "schedule": 10.0},
         "cleanup-expired": {"task": "maintenance.cleanup", "schedule": 3600.0},
     },
 )

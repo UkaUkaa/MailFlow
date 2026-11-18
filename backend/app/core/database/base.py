@@ -47,4 +47,6 @@ TENANT_TABLES: tuple[str, ...] = (
     "email_threads",
     "email_messages",
     "attachments",
+    "outbox_items",
+    "outbox_attachments",
 )

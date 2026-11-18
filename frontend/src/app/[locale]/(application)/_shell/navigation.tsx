@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { AccountSwitcher } from "@/modules/accounts";
 import { useComposer } from "@/modules/composer";
 import { CustomFolderNav, FolderNav } from "@/modules/folders";
+import { ScheduledNavItem } from "@/modules/outbox";
 import { Link, usePathname } from "@/infrastructure/i18n/navigation";
 import { useShell, type NavigationVariant } from "@/shared/components/layout/app-shell";
 import { BrandGlyph } from "@/shared/components/layout/brand";
@@ -20,7 +21,7 @@ import { QuickPreferences } from "./quick-preferences";
  *   expanding only widens the column and reveals the labels (and unread counts).
  * - `drawer` (phone): the same rows, always expanded, closing when a destination is chosen.
  *
- * Order: toggle, compose, mail views, accounts (then the mailbox's folders, expanded only),
+ * Order: toggle, compose, mail views (with Scheduled after Sent), accounts (then the mailbox's folders, expanded only),
  * and at the bottom language, theme and settings.
  */
 export function Navigation({ variant }: { variant: NavigationVariant }) {
@@ -80,7 +81,11 @@ export function Navigation({ variant }: { variant: NavigationVariant }) {
       </div>
 
       <div className="mt-5 flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto [scrollbar-width:none] touch:mt-3">
-        <FolderNav expanded={expanded} onNavigate={onNavigate} />
+        <FolderNav
+          expanded={expanded}
+          onNavigate={onNavigate}
+          extras={{ sent: <ScheduledNavItem expanded={expanded} onNavigate={onNavigate} /> }}
+        />
         <AccountSwitcher expanded={expanded} onNavigate={onNavigate} />
         {expanded ? <CustomFolderNav onNavigate={onNavigate} /> : null}
       </div>

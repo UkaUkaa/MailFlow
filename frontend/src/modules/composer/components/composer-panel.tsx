@@ -13,7 +13,7 @@ import {
   MAX_ATTACHMENT_TOTAL_BYTES,
   type Attachment,
 } from "@/modules/attachments";
-import { isApiError } from "@/infrastructure/api-client";
+import { SendLaterMenu } from "@/modules/outbox";
 import { ResponsiveDialog } from "@/shared/components/layout/responsive-dialog";
 import { Button } from "@/shared/components/ui/button";
 import { NativeSelect } from "@/shared/components/ui/input";
@@ -25,7 +25,9 @@ import type { Address } from "@/shared/types/address";
 import { createDraft, deleteDraft, sendEmail, updateDraft } from "../api";
 import { isValidEmail } from "../lib/recipients";
 import { useVisualViewportVars } from "../lib/use-visual-viewport";
-import type { ComposeSession, DraftRequest } from "../types";
+import { toServerLocalTime } from "@/shared/lib/user-time";
+import { sendErrorKey } from "../lib/send-errors";
+import type { ComposeSession, DraftRequest, SendResult } from "../types";
 import { RecipientsInput } from "./recipients-input";
 import { EditorToolbar, RichTextArea, useRichTextEditor } from "./rich-text-editor";
 
@@ -43,7 +45,16 @@ const square = "md:size-7 md:rounded-sm md:border md:border-border-strong";
  * - replies and forwards on desktop (≥ 1024px): a panel docked at the bottom right of the
  *   reading pane, which can be expanded to the page and docked again.
  */
-export function ComposerPanel({ session, onClose }: { session: ComposeSession; onClose: () => void }) {
+export function ComposerPanel({
+  session,
+  onClose,
+  onSent,
+}: {
+  session: ComposeSession;
+  onClose: () => void;
+  /** Called after the server accepted the send, with the composer's state for a possible undo. */
+  onSent: (result: SendResult, snapshot: ComposeSession) => void;
+}) {
   const t = useTranslations("composer");
   const tc = useTranslations("common");
   const queryClient = useQueryClient();
@@ -71,7 +82,7 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
   const [recipientsOpen, setRecipientsOpen] = useState(session.cc.length > 0 || session.bcc.length > 0);
   const [subject, setSubject] = useState(session.subject);
   const [bodyEmpty, setBodyEmpty] = useState(!session.bodyHtml);
-  const [files, setFiles] = useState<File[]>([]);
+  const [files, setFiles] = useState<File[]>(session.files ?? []);
   const [forwarded, setForwarded] = useState<Attachment[]>(session.forwardAttachments);
   const [includeQuote, setIncludeQuote] = useState(Boolean(session.quotedHtml));
   const [showQuote, setShowQuote] = useState(false);
@@ -80,6 +91,10 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
   const [error, setError] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [confirmNoSubject, setConfirmNoSubject] = useState(false);
+  // The send-later picker is rendered through portals, but its keys still bubble to this panel.
+  const [scheduleOpen, setScheduleOpen] = useState(false);
+  /** The time chosen in "Send later" while the "no subject" question is open. */
+  const pendingSendAt = useRef<Date | null>(null);
 
   // A mailbox without a Drafts folder cannot store drafts: nothing is autosaved for it, and
   // closing asks before throwing the message away instead of failing to save it.
@@ -87,7 +102,7 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
 
   const htmlRef = useRef(session.bodyHtml);
   const draftIdRef = useRef(session.draftId);
-  const dirtyRef = useRef(false);
+  const dirtyRef = useRef(Boolean(session.unsaved));
   const chainRef = useRef<Promise<void>>(Promise.resolve());
   const closedRef = useRef(false);
 
@@ -234,8 +249,9 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
     touch();
   };
 
-  const send = async (allowEmptySubject = false) => {
+  const send = async (allowEmptySubject = false, sendAt: Date | null = null) => {
     if (sending) return;
+    pendingSendAt.current = sendAt;
     const recipients = [...to, ...cc, ...bcc];
     if (!accountId) return setError(t("errors.noAccount"));
     if (recipients.length === 0) return setError(t("errors.noRecipients"));
@@ -249,30 +265,41 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
     autosave.cancel();
     await chainRef.current;
     try {
-      await sendEmail(
+      const result = await sendEmail(
         {
           ...request,
           ...(draftIdRef.current ? { draft_id: draftIdRef.current } : {}),
           ...(forwarded.length > 0 ? { forward_attachment_ids: forwarded.map((item) => item.id) } : {}),
+          ...(sendAt ? { send_at: toServerLocalTime(sendAt) } : {}),
         },
         files,
         session.key,
       );
       closedRef.current = true;
       dirtyRef.current = false;
-      toast.success(t("sent"));
-      refreshMail();
       onClose();
+      // Everything needed to put this composer back if the send is undone.
+      onSent(result, {
+        ...session,
+        accountId,
+        to,
+        cc,
+        bcc,
+        subject,
+        bodyHtml: htmlRef.current,
+        quotedHtml: includeQuote ? session.quotedHtml : null,
+        draftId: draftIdRef.current,
+        forwardAttachments: forwarded,
+        files,
+      });
     } catch (cause) {
       setSending(false);
-      const code = isApiError(cause) ? cause.code : "unknown";
-      const known = ["payload_too_large", "provider_auth_required", "rate_limited", "provider_unavailable", "provider_rate_limited", "network_error"] as const;
-      setError(t(`errors.send.${known.find((item) => item === code) ?? "unknown"}`));
+      setError(t(`errors.send.${sendErrorKey(cause)}`));
     }
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !scheduleOpen) {
       event.preventDefault();
       void send();
     }
@@ -280,7 +307,7 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
   // Capture phase: the rich-text editor consumes Escape, so a bubbling handler never sees it
   // while the caret is in the message body.
   const onKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape" && !event.defaultPrevented && !confirmDiscard && !confirmNoSubject) {
+    if (event.key === "Escape" && !event.defaultPrevented && !confirmDiscard && !confirmNoSubject && !scheduleOpen) {
       event.preventDefault();
       event.stopPropagation();
       void close();
@@ -294,13 +321,33 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
   const sendShortcut = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘ Enter" : "Ctrl Enter";
   const chooseFrom = activeAccounts.length > 1 || !accountId;
 
+  // Split button: send now, or open the "Send later" choices from the adjoining half.
   const sendButton = (
-    <Tooltip label={t("send")} shortcut={sendShortcut}>
-      <Button variant="primary" size={docked ? "sm" : "md"} loading={sending} onClick={() => void send()} className="shrink-0">
-        <Send className="size-4" aria-hidden />
-        {t("send")}
-      </Button>
-    </Tooltip>
+    <div className="flex shrink-0 items-center gap-px">
+      <Tooltip label={t("send")} shortcut={sendShortcut}>
+        <Button variant="primary" size={docked ? "sm" : "md"} loading={sending} onClick={() => void send()} className="shrink-0 rounded-r-none">
+          <Send className="size-4" aria-hidden />
+          {t("send")}
+        </Button>
+      </Tooltip>
+      <SendLaterMenu
+        title={t("sendLater")}
+        confirmLabel={t("scheduleSend")}
+        onSelect={(sendAt) => void send(false, sendAt)}
+        onOpenChange={setScheduleOpen}
+        trigger={
+          <Button
+            variant="primary"
+            size="icon"
+            aria-label={t("scheduleLabel")}
+            disabled={sending}
+            className={cn("shrink-0 rounded-l-none", !docked && "h-9 w-8 touch:size-11")}
+          >
+            <ChevronDown />
+          </Button>
+        }
+      />
+    </div>
   );
 
   const closeButton = (
@@ -642,7 +689,7 @@ export function ComposerPanel({ session, onClose }: { session: ComposeSession; o
               variant="primary"
               onClick={() => {
                 setConfirmNoSubject(false);
-                void send(true);
+                void send(true, pendingSendAt.current);
               }}
             >
               {t("sendAnyway")}

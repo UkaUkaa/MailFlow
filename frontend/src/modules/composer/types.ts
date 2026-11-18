@@ -34,7 +34,23 @@ export interface DraftRequest {
 export interface SendRequest extends DraftRequest {
   draft_id?: string;
   forward_attachment_ids?: string[];
+  /** ISO-8601 UTC moment to send at ("Send later"); absent for an ordinary send. */
+  send_at?: string;
 }
+
+/**
+ * What the server did with a send: delivered it, is holding it for the undo window, or queued
+ * it for a later time. The two held kinds can still be cancelled through the outbox.
+ */
+export const sendResultSchema = z.object({
+  status: z.enum(["sent", "undoable", "scheduled"]),
+  message_id: z.string().nullable(),
+  thread_id: z.string().nullable(),
+  outbox_id: z.string().nullable(),
+  send_at: z.string().nullable(),
+  undo_seconds: z.number(),
+});
+export type SendResult = z.infer<typeof sendResultSchema>;
 
 /** Everything needed to open the composer. `key` doubles as the idempotency key for sending. */
 export interface ComposeSession {
@@ -51,4 +67,11 @@ export interface ComposeSession {
   sourceMessageId: string | null;
   draftId: string | null;
   forwardAttachments: Attachment[];
+  /** Files already attached: set when a cancelled send is reopened with what the user had picked. */
+  files?: File[];
+  /**
+   * The content exists nowhere but in this session (a send that was cancelled): closing the
+   * composer saves it as a draft, or asks first, even if the user changes nothing.
+   */
+  unsaved?: boolean;
 }

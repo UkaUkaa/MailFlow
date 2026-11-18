@@ -36,6 +36,9 @@ Update this file whenever an item changes state.
 - [x] Compose / reply / reply-all / forward with idempotent send
 - [~] Drafts (provider-backed; attachments are not saved with drafts)
 - [x] Attachments (metadata + safe download), search, unread counts
+- [x] Send later and undo send on a scheduled outbox (D42): schedule, list, reschedule, cancel,
+      exactly-once dispatch by Celery; verified with the fake provider and GreenMail SMTP.
+      UI (send-later menu, undo toast, Scheduled view, setting) verified with the mocked API only
 - [x] Account deletion and deactivation
 
 ## Phase 6 — Responsive frontend
@@ -59,7 +62,7 @@ Update this file whenever an item changes state.
 
 ## Phase 8 — Testing and security review
 - [x] Backend: unit, integration, security, architecture suites; Ruff; MyPy strict
-- [x] Frontend: ESLint, TypeScript, Vitest (204), Playwright (142, incl. hydration regression)
+- [x] Frontend: ESLint, TypeScript, Vitest (274), Playwright (185, incl. hydration regression)
 - [~] Security review: internal checklist applied; no external assessment
 
 ## Phase 9 — Finalization
