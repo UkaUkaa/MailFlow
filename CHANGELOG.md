@@ -8,6 +8,10 @@
   language; an empty subject is filled with a suggested one. `POST /assistant/compose`.
 
 ### Changed
+- New README in English and Ukrainian (`README.uk.md`) with screenshots, architecture and
+  engineering overview.
+- Removed `docker-compose.prod.yml` and `infra/nginx/nginx.prod.conf`. Production runs the same
+  `docker-compose.yml` behind a host reverse proxy that terminates TLS (`docs/DOCKER.md`).
 - The composer always shows which mailbox the email is sent from (mark, name and full address),
   on phone, tablet and desktop, even with a single mailbox; with several it is a picker.
 - Remote images in emails are shown by default for new users. Existing users keep their saved

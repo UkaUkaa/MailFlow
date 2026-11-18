@@ -1,6 +1,5 @@
 # MailFlow — complete local stack.  Start with:  docker compose up --build
 # Only Nginx publishes a port. PostgreSQL and Redis live on an internal-only network.
-# Production overrides: docker-compose.prod.yml (see docs/DOCKER.md).
 name: mailflow
 
 x-backend-env: &backend-env
