@@ -40,7 +40,8 @@ export function useUpdateProfile() {
   });
 }
 
-function useAccountRemoval(request: (password: string) => Promise<void>) {
+/** ``password`` is null when a fresh Google confirmation (an HttpOnly cookie) stands in for it. */
+function useAccountRemoval(request: (password: string | null) => Promise<void>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: request,
@@ -49,11 +50,17 @@ function useAccountRemoval(request: (password: string) => Promise<void>) {
 }
 
 export function useDeactivateAccount() {
-  return useAccountRemoval((password) => api.post("/users/me/deactivate", null, { password }, { skipAuthRedirect: true }));
+  return useAccountRemoval((password) =>
+    api.post("/users/me/deactivate", null, password === null ? {} : { password }, { skipAuthRedirect: true }),
+  );
 }
 
 export function useDeleteAccount() {
   return useAccountRemoval((password) =>
-    api.delete("/users/me", { password, confirmation: "DELETE" }, { skipAuthRedirect: true }),
+    api.delete(
+      "/users/me",
+      password === null ? { confirmation: "DELETE" } : { password, confirmation: "DELETE" },
+      { skipAuthRedirect: true },
+    ),
   );
 }

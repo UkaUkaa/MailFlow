@@ -80,3 +80,19 @@ class SignInProviders(BaseModel):
     """External sign-in methods that are configured on this deployment."""
 
     google: bool
+
+
+class ReauthMethods(BaseModel):
+    """Ways the signed-in user can confirm a sensitive action besides the password."""
+
+    google: bool
+
+
+class ReauthStart(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    purpose: Literal["delete", "deactivate"]
+    locale: Literal["en", "uk"] = "en"
+
+
+class ReauthStarted(BaseModel):
+    authorization_url: str

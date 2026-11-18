@@ -52,7 +52,9 @@ unless `API_DOCS_ENABLED=true`).
 | POST | `/auth/sessions/revoke-others` | — | `204` |
 | GET | `/auth/providers` | — | `{google: bool}` — external sign-in methods configured here |
 | GET | `/auth/oauth/google/start?locale=&next=` | — | `302` to Google (scopes `openid email profile`) + HttpOnly `mf_signin_state` cookie |
-| GET | `/auth/oauth/google/callback` | `code`, `state` from Google | `302` to `/{locale}{next}` + session cookie, or to `/{locale}/login?oauth_error=<code>` |
+| GET | `/auth/oauth/google/callback` | `code`, `state` from Google | `302` to `/{locale}{next}` + session cookie, or to `/{locale}/login?oauth_error=<code>`; for a re-confirmation `302` to `/{locale}/settings/danger?reauth=<purpose>` + HttpOnly `mf_reauth` cookie, or `&reauth_error=<code>` (`reauth_mismatch`, `reauth_stale`, `access_denied`, `provider_error`, `account_disabled`) |
+| GET | `/auth/reauth/methods` | — | `{google}`: whether a fresh Google sign-in can confirm a sensitive action (configured and linked) |
+| POST | `/auth/oauth/google/reauth` | `{purpose:"delete"\|"deactivate", locale}` | `{authorization_url}` + `mf_signin_state` cookie; `422` when no Google account is linked |
 
 `User`: `{id, email, display_name, email_verified, created_at}`.
 `Session`: `{id, created_at, last_seen_at, expires_at, user_agent, ip_address, is_current}`.
@@ -69,8 +71,8 @@ connected separately under `/accounts`). `next` must be a same-origin path, othe
 |---|---|---|---|
 | GET | `/users/me` | — | `User` |
 | PATCH | `/users/me` | `{display_name}` | `User` |
-| POST | `/users/me/deactivate` | `{password}` | `204` (sessions revoked, sync stopped) |
-| DELETE | `/users/me` | `{password, confirmation:"DELETE"}` | `204` |
+| POST | `/users/me/deactivate` | `{password?}` | `204` (sessions revoked, sync stopped). Without `password` a `mf_reauth` grant for `deactivate` is required |
+| DELETE | `/users/me` | `{password?, confirmation:"DELETE"}` | `204`. Without `password` a `mf_reauth` grant for `delete` is required |
 
 ## Settings — `/settings`
 

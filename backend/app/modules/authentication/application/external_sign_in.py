@@ -10,25 +10,38 @@ import base64
 import hashlib
 import re
 import secrets
+import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from app.modules.authentication.application.ports import (
     IdentityRepository,
     PasswordHasher,
     PendingSignIn,
+    ReauthGrant,
+    ReauthGrantStore,
     SessionRepository,
     SignInProvider,
     SignInStateStore,
 )
 from app.modules.authentication.application.services import SessionService
-from app.modules.authentication.domain.entities import ExternalIdentity, ExternalSignInError
+from app.modules.authentication.domain.entities import (
+    ExternalIdentity,
+    ExternalSignInError,
+    ReauthPurpose,
+)
 from app.modules.users.application import UserRepository
 from app.modules.users.domain import User, normalize_display_name, normalize_email
 from app.shared.application.ports import AuditLog, Clock
-from app.shared.domain.errors import ProviderNotConfiguredError
+from app.shared.domain.errors import InvalidInputError, ProviderNotConfiguredError
 
 STATE_TTL_SECONDS = 600
 DEFAULT_NEXT = "/mail/inbox"
+REAUTH_NEXT = "/settings/danger"
+# A re-confirmation grant lives just long enough to finish the dialog it was started from.
+REAUTH_GRANT_TTL_SECONDS = 300
+# Reject a provider sign-in older than this even if the provider ignored ``max_age``.
+REAUTH_MAX_AGE_SECONDS = 600
 LOCALES = ("en", "uk")
 # A same-origin path inside the localized app: no scheme, no host, no "//", no backslash.
 _SAFE_NEXT = re.compile(r"^/(?!/)[A-Za-z0-9/_\-.~%?=&]{0,500}$")
@@ -64,6 +77,9 @@ class SignInOutcome:
     user: User | None = None
     session_token: str | None = None
     error: str | None = None
+    # Set for a re-confirmation flow; the token is only present when it succeeded.
+    reauth_purpose: ReauthPurpose | None = None
+    reauth_token: str | None = None
 
 
 class ExternalSignInService:
@@ -78,6 +94,7 @@ class ExternalSignInService:
         hasher: PasswordHasher,
         audit: AuditLog,
         clock: Clock,
+        grants: ReauthGrantStore,
     ) -> None:
         self._provider = provider
         self._states = states
@@ -88,6 +105,7 @@ class ExternalSignInService:
         self._hasher = hasher
         self._audit = audit
         self._clock = clock
+        self._grants = grants
 
     @property
     def configured(self) -> bool:
@@ -115,6 +133,43 @@ class ExternalSignInService:
         )
         return StartedSignIn(state=state, authorization_url=url)
 
+    async def can_reauthenticate(self, user_id: uuid.UUID) -> bool:
+        return self._provider.configured and await self._identities.is_linked(
+            user_id, self._provider.kind
+        )
+
+    async def start_reauth(
+        self, *, user_id: uuid.UUID, purpose: ReauthPurpose, locale: str | None
+    ) -> StartedSignIn:
+        """Re-confirm the signed-in user with a fresh provider sign-in before a sensitive action.
+
+        This is how users who signed up with the provider (and so never chose a password)
+        confirm deleting or deactivating their account.
+        """
+        if not self._provider.configured:
+            raise ProviderNotConfiguredError
+        if not await self._identities.is_linked(user_id, self._provider.kind):
+            raise InvalidInputError("No linked account at this provider.")
+        state = secrets.token_urlsafe(32)
+        verifier = secrets.token_urlsafe(64)
+        nonce = secrets.token_urlsafe(32)
+        await self._states.put(
+            state_hash(state),
+            PendingSignIn(
+                code_verifier=verifier,
+                nonce=nonce,
+                locale=_locale(locale),
+                next_path=REAUTH_NEXT,
+                reauth_user_id=user_id,
+                reauth_purpose=purpose,
+            ),
+            STATE_TTL_SECONDS,
+        )
+        url = self._provider.authorization_url(
+            state=state, code_challenge=code_challenge(verifier), nonce=nonce, reauthenticate=True
+        )
+        return StartedSignIn(state=state, authorization_url=url)
+
     async def complete(
         self,
         *,
@@ -137,7 +192,12 @@ class ExternalSignInService:
             return SignInOutcome(locale="en", next_path=DEFAULT_NEXT, error="invalid_state")
 
         def failed(error: str) -> SignInOutcome:
-            return SignInOutcome(locale=pending.locale, next_path=pending.next_path, error=error)
+            return SignInOutcome(
+                locale=pending.locale,
+                next_path=pending.next_path,
+                error=error,
+                reauth_purpose=pending.reauth_purpose,
+            )
 
         if provider_error:
             denied = provider_error == "access_denied"
@@ -150,6 +210,10 @@ class ExternalSignInService:
             )
         except ExternalSignInError:
             return failed("provider_error")
+        if pending.reauth_user_id is not None and pending.reauth_purpose is not None:
+            return await self._complete_reauth(
+                pending, pending.reauth_user_id, pending.reauth_purpose, identity, failed
+            )
         if not identity.email_verified:
             return failed("email_not_verified")
 
@@ -167,6 +231,49 @@ class ExternalSignInService:
         )
         return SignInOutcome(
             locale=pending.locale, next_path=pending.next_path, user=user, session_token=token
+        )
+
+    async def _complete_reauth(
+        self,
+        pending: PendingSignIn,
+        user_id: uuid.UUID,
+        purpose: ReauthPurpose,
+        identity: ExternalIdentity,
+        failed: Callable[[str], SignInOutcome],
+    ) -> SignInOutcome:
+        # Only the provider account already linked to this user can confirm for it. Nothing is
+        # linked or created here: a different account is simply a failed confirmation.
+        linked_user = await self._identities.get_user_id(identity.provider, identity.subject)
+        if linked_user != user_id:
+            await self._audit.record(
+                "auth.reauth_failed", user_id=user_id, metadata={"reason": "mismatch"}
+            )
+            return failed("reauth_mismatch")
+        now = self._clock.now().timestamp()
+        if (
+            identity.authenticated_at is not None
+            and now - identity.authenticated_at > REAUTH_MAX_AGE_SECONDS
+        ):
+            return failed("reauth_stale")
+        user = await self._users.get_by_id(user_id)
+        if user is None or not user.is_active:
+            return failed("account_disabled")
+        token = secrets.token_urlsafe(32)
+        await self._grants.put(
+            state_hash(token),
+            ReauthGrant(user_id=user_id, purpose=purpose),
+            REAUTH_GRANT_TTL_SECONDS,
+        )
+        await self._audit.record(
+            "auth.reauthenticated",
+            user_id=user_id,
+            metadata={"method": identity.provider.value, "purpose": purpose.value},
+        )
+        return SignInOutcome(
+            locale=pending.locale,
+            next_path=pending.next_path,
+            reauth_purpose=purpose,
+            reauth_token=token,
         )
 
     async def _resolve_user(self, identity: ExternalIdentity) -> User | None:
@@ -207,3 +314,15 @@ class ExternalSignInService:
 
     def _unusable_password(self) -> str:
         return self._hasher.hash(secrets.token_urlsafe(48))
+
+
+class ReauthGrantVerifier:
+    """Redeems a re-confirmation grant for one sensitive action of one user."""
+
+    def __init__(self, grants: ReauthGrantStore) -> None:
+        self._grants = grants
+
+    async def consume(self, user_id: uuid.UUID, purpose: str, token: str) -> bool:
+        # Taken (and so burned) even when it does not match: a grant is never tried twice.
+        grant = await self._grants.take(state_hash(token))
+        return grant is not None and grant.user_id == user_id and grant.purpose.value == purpose

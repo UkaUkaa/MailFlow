@@ -14,6 +14,12 @@
   PNG app icons, the Apple web-app meta tags, and `public/` in the frontend Docker image.
 
 ### Added
+- **Delete or deactivate a Google-only account.** Users who signed up with Google never chose a
+  password, so the confirmation dialog could not be completed. When a Google account is linked,
+  Settings → Delete account now offers "Confirm with Google": a fresh Google sign-in
+  (`prompt=login`, `max_age=300`) with the same linked Google account issues a single-use,
+  purpose-bound grant (HttpOnly `mf_reauth` cookie, 5 minutes) that stands in for the password.
+  The password still works for everyone; deletion still needs the typed `DELETE` (D44).
 - **Templates.** Settings → Templates lists, creates, edits and deletes reusable messages
   (name, subject, formatted body). In the composer a Templates menu inserts one — into an empty
   body whole, otherwise at the caret — filling `{{first_name}}`, `{{name}}`, `{{email}}`,

@@ -102,3 +102,27 @@ export function useSignInProviders() {
     staleTime: 5 * 60_000,
   });
 }
+
+const reauthMethodsSchema = z.object({ google: z.boolean() });
+const reauthStartedSchema = z.object({ authorization_url: z.string().url() });
+
+export type ReauthPurpose = "delete" | "deactivate";
+
+/** Ways to confirm a sensitive action besides the password (a fresh Google sign-in). */
+export function useReauthMethods() {
+  return useQuery({
+    queryKey: ["auth", "reauth-methods"] as const,
+    queryFn: ({ signal }) => api.get("/auth/reauth/methods", reauthMethodsSchema, { signal }),
+    staleTime: 5 * 60_000,
+  });
+}
+
+/** Starts a fresh Google sign-in that confirms deleting or deactivating the account. */
+export function useStartGoogleReauth() {
+  return useMutation({
+    mutationFn: (body: { purpose: ReauthPurpose; locale: string }) =>
+      api.post("/auth/oauth/google/reauth", reauthStartedSchema, body),
+    // A top-level navigation: Google redirects back to the danger-zone settings page.
+    onSuccess: ({ authorization_url }) => window.location.assign(authorization_url),
+  });
+}

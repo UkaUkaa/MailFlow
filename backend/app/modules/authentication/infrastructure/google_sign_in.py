@@ -25,6 +25,8 @@ TOKEN_URL = "https://oauth2.googleapis.com/token"
 ISSUERS = frozenset({"https://accounts.google.com", "accounts.google.com"})
 SCOPES = ("openid", "email", "profile")
 CLOCK_SKEW_SECONDS = 60
+# Re-confirmation asks Google for a sign-in no older than this (OIDC ``max_age``).
+REAUTH_MAX_AGE_SECONDS = 300
 
 
 def _decode_segment(segment: str) -> dict[str, object]:
@@ -50,7 +52,9 @@ class GoogleSignInClient:
     def configured(self) -> bool:
         return bool(self._client_id and self._client_secret)
 
-    def authorization_url(self, *, state: str, code_challenge: str, nonce: str) -> str:
+    def authorization_url(
+        self, *, state: str, code_challenge: str, nonce: str, reauthenticate: bool = False
+    ) -> str:
         params = {
             "client_id": self._client_id,
             "redirect_uri": self._redirect_uri,  # fixed server-side value, never user input
@@ -63,6 +67,10 @@ class GoogleSignInClient:
             "access_type": "online",  # no refresh token: nothing is stored after sign-in
             "prompt": "select_account",
         }
+        if reauthenticate:
+            # Make Google ask for the account's credentials again and report ``auth_time``.
+            params["prompt"] = "login"
+            params["max_age"] = str(REAUTH_MAX_AGE_SECONDS)
         return f"{AUTH_URL}?{urlencode(params)}"
 
     async def exchange(self, *, code: str, code_verifier: str, nonce: str) -> ExternalIdentity:
@@ -124,10 +132,12 @@ class GoogleSignInClient:
             raise ExternalSignInError("id_token lacks sub or email")
         verified = claims.get("email_verified")
         name = claims.get("name")
+        auth_time = claims.get("auth_time")
         return ExternalIdentity(
             provider=self.kind,
             subject=subject,
             email=email,
             email_verified=verified is True or verified == "true",
             display_name=name if isinstance(name, str) else "",
+            authenticated_at=float(auth_time) if isinstance(auth_time, int | float) else None,
         )

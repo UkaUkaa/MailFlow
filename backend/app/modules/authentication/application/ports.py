@@ -10,6 +10,7 @@ from typing import Protocol
 from app.modules.authentication.domain.entities import (
     ExternalIdentity,
     OneTimeTokenKind,
+    ReauthPurpose,
     Session,
     SignInProviderKind,
 )
@@ -68,6 +69,9 @@ class PendingSignIn:
     nonce: str
     locale: str
     next_path: str
+    # Set when the flow re-confirms an already signed-in user instead of signing someone in.
+    reauth_user_id: uuid.UUID | None = None
+    reauth_purpose: ReauthPurpose | None = None
 
 
 class SignInStateStore(Protocol):
@@ -81,7 +85,11 @@ class SignInProvider(Protocol):
 
     @property
     def configured(self) -> bool: ...
-    def authorization_url(self, *, state: str, code_challenge: str, nonce: str) -> str: ...
+    def authorization_url(
+        self, *, state: str, code_challenge: str, nonce: str, reauthenticate: bool = False
+    ) -> str:
+        """``reauthenticate`` asks the provider to make the user sign in again right now."""
+
     async def exchange(self, *, code: str, code_verifier: str, nonce: str) -> ExternalIdentity:
         """Redeem the code and return the validated identity; raise ExternalSignInError."""
 
@@ -91,3 +99,18 @@ class IdentityRepository(Protocol):
     async def add(
         self, *, user_id: uuid.UUID, provider: SignInProviderKind, subject: str, email: str
     ) -> None: ...
+    async def is_linked(self, user_id: uuid.UUID, provider: SignInProviderKind) -> bool: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ReauthGrant:
+    user_id: uuid.UUID
+    purpose: ReauthPurpose
+
+
+class ReauthGrantStore(Protocol):
+    """Short-lived, single-use proof that a user just re-confirmed their identity."""
+
+    async def put(self, token_hash: str, grant: ReauthGrant, ttl_seconds: int) -> None: ...
+    async def take(self, token_hash: str) -> ReauthGrant | None:
+        """Atomically remove and return the grant. One grant confirms one action."""

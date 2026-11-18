@@ -10,10 +10,12 @@ from fastapi.responses import RedirectResponse
 from app.core.config import Settings
 from app.core.dependencies import DbSession, SettingsDep, client_ip, rate_limit, user_agent
 from app.core.security.tokens import generate_token
+from app.modules.authentication.application.external_sign_in import SignInOutcome
 from app.modules.authentication.application.services import (
     PasswordService,
     RegistrationService,
 )
+from app.modules.authentication.domain.entities import ReauthPurpose
 from app.modules.authentication.presentation import schemas as s
 from app.modules.authentication.presentation.dependencies import (
     Auth,
@@ -221,6 +223,9 @@ async def revoke_session(session_id: uuid.UUID, auth: Auth, sessions: SessionSer
 
 SIGN_IN_STATE_COOKIE = "mf_signin_state"
 SIGN_IN_COOKIE_PATH = "/api/v1/auth/oauth/"
+# Single-use proof of a fresh Google sign-in, redeemed by DELETE /users/me or deactivation.
+REAUTH_COOKIE = "mf_reauth"
+REAUTH_COOKIE_PATH = "/api/v1/users/me"
 
 
 @router.get("/providers", response_model=s.SignInProviders)
@@ -233,6 +238,20 @@ def _login_redirect(settings: Settings, locale: str, error: str) -> RedirectResp
     query = urlencode({"oauth_error": error})
     return RedirectResponse(
         f"{settings.app_base_url}/{locale}/login?{query}", status_code=status.HTTP_302_FOUND
+    )
+
+
+def _set_state_cookie(response: Response, settings: Settings, state: str) -> None:
+    # Binds the flow to this browser; checked against the returned state (login CSRF).
+    response.set_cookie(
+        SIGN_IN_STATE_COOKIE,
+        state,
+        max_age=600,
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite="lax",  # sent on Google's top-level redirect back to the callback
+        path=SIGN_IN_COOKIE_PATH,
+        domain=settings.cookie_domain,
     )
 
 
@@ -254,17 +273,59 @@ async def google_sign_in_start(
         fallback = locale if locale in ("en", "uk") else "en"
         return _login_redirect(settings, fallback, "not_configured")
     response = RedirectResponse(started.authorization_url, status_code=status.HTTP_302_FOUND)
-    # Binds the flow to this browser; checked against the returned state (login CSRF).
-    response.set_cookie(
-        SIGN_IN_STATE_COOKIE,
-        started.state,
-        max_age=600,
-        httponly=True,
-        secure=settings.secure_cookies,
-        samesite="lax",  # sent on Google's top-level redirect back to the callback
-        path=SIGN_IN_COOKIE_PATH,
-        domain=settings.cookie_domain,
+    _set_state_cookie(response, settings, started.state)
+    return response
+
+
+@router.get("/reauth/methods", response_model=s.ReauthMethods)
+async def reauth_methods(auth: Auth, google: GoogleSignInDep) -> s.ReauthMethods:
+    return s.ReauthMethods(google=await google.can_reauthenticate(auth.user_id))
+
+
+@router.post(
+    "/oauth/google/reauth",
+    response_model=s.ReauthStarted,
+    dependencies=[Depends(rate_limit("reauth-start", limit=10, window_seconds=900))],
+)
+async def google_reauth_start(
+    body: s.ReauthStart,
+    auth: Auth,
+    settings: SettingsDep,
+    google: GoogleSignInDep,
+    response: Response,
+) -> s.ReauthStarted:
+    """Start a fresh Google sign-in that confirms deleting or deactivating this account.
+
+    A POST (so CSRF-protected) that returns the URL; the client then navigates to it.
+    """
+    started = await google.start_reauth(
+        user_id=auth.user_id, purpose=ReauthPurpose(body.purpose), locale=body.locale
     )
+    _set_state_cookie(response, settings, started.state)
+    return s.ReauthStarted(authorization_url=started.authorization_url)
+
+
+def _reauth_redirect(settings: Settings, outcome: SignInOutcome) -> RedirectResponse:
+    # Built from server configuration and server-side state only — never from request input.
+    purpose = outcome.reauth_purpose.value if outcome.reauth_purpose else ""
+    params = {"reauth": purpose}
+    if outcome.reauth_token is None:
+        params["reauth_error"] = outcome.error or "provider_error"
+    response = RedirectResponse(
+        f"{settings.app_base_url}/{outcome.locale}{outcome.next_path}?{urlencode(params)}",
+        status_code=status.HTTP_302_FOUND,
+    )
+    if outcome.reauth_token is not None:
+        response.set_cookie(
+            REAUTH_COOKIE,
+            outcome.reauth_token,
+            max_age=300,
+            httponly=True,
+            secure=settings.secure_cookies,
+            samesite="strict",  # only ever sent by MailFlow's own delete/deactivate requests
+            path=REAUTH_COOKIE_PATH,
+            domain=settings.cookie_domain,
+        )
     return response
 
 
@@ -289,7 +350,9 @@ async def google_sign_in_callback(
         ip_address=client_ip(request),
         user_agent=user_agent(request),
     )
-    if outcome.session_token is None:
+    if outcome.reauth_purpose is not None:
+        response = _reauth_redirect(settings, outcome)
+    elif outcome.session_token is None:
         response = _login_redirect(settings, outcome.locale, outcome.error or "provider_error")
     else:
         response = RedirectResponse(

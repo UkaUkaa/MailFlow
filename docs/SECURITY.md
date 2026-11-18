@@ -175,9 +175,17 @@ account deletion and expire after 180 days.
   attachment bytes, raw HTML.
 - Disconnecting a mailbox revokes the Google grant (best effort), deletes credentials and all its
   mail data in one transaction. Credentials are deleted even when revocation fails.
-- Deleting a MailFlow account: password + typed confirmation → status `deleting` (blocks workers
+- Deleting a MailFlow account: password (or a fresh Google re-confirmation, below) + typed
+  confirmation → status `deleting` (blocks workers
   and scheduler) → sessions revoked → every mailbox disconnected as above → Redis keys purged →
   user row deleted (cascade) → audit entries detached. Safe to repeat.
+- Google re-confirmation (for users who signed up with Google and have no known password):
+  started by an authenticated, CSRF-protected POST; the state/PKCE/nonce flow is the sign-in one,
+  plus `prompt=login` and `max_age=300`. The callback only accepts the Google `sub` already linked
+  to the user who started it (nothing is linked or created), and rejects an `auth_time` older than
+  10 minutes when Google reports one. Success stores a random token's hash in Redis (5 minutes,
+  bound to user and purpose) and sets it as an HttpOnly, `SameSite=Strict` cookie scoped to
+  `/api/v1/users/me`. Redeeming takes the grant atomically, so it is single use even on mismatch.
 - Provider revocation can fail (network, already revoked). The user can always revoke access in
   their Google account; this is noted in the UI documentation.
 

@@ -73,6 +73,15 @@ class ExternalIdentity:
     email: str
     email_verified: bool
     display_name: str
+    # When the provider last actually authenticated the user (OIDC ``auth_time``), if reported.
+    authenticated_at: float | None = None
+
+
+class ReauthPurpose(StrEnum):
+    """Sensitive account actions that a fresh external sign-in can confirm instead of a password."""
+
+    DELETE = "delete"
+    DEACTIVATE = "deactivate"
 
 
 class ExternalSignInError(Exception):

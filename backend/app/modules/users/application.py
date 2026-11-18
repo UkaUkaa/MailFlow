@@ -26,6 +26,11 @@ class PasswordVerifier(Protocol):
     def verify(self, password_hash: str | None, password: str) -> bool: ...
 
 
+class ReauthVerifier(Protocol):
+    async def consume(self, user_id: uuid.UUID, purpose: str, token: str) -> bool:
+        """Redeem a single-use re-confirmation (e.g. a fresh Google sign-in) for ``purpose``."""
+
+
 class SessionRevoker(Protocol):
     async def revoke_all(self, user_id: uuid.UUID) -> None: ...
 
@@ -64,31 +69,47 @@ class AccountLifecycleService:
         mailboxes: MailboxDisconnector,
         cache: TenantCache,
         audit: AuditLog,
+        reauth: ReauthVerifier,
     ) -> None:
         self._users = users
         self._passwords = passwords
+        self._reauth = reauth
         self._sessions = sessions
         self._mailboxes = mailboxes
         self._cache = cache
         self._audit = audit
 
-    async def _confirm(self, user_id: uuid.UUID, password: str) -> User:
+    async def _confirm(
+        self, user_id: uuid.UUID, purpose: str, password: str | None, reauth_token: str | None
+    ) -> User:
+        """Either the password or a fresh re-confirmation grant for this very action.
+
+        Users who signed up with Google never chose a password, so they confirm by signing in
+        to Google again instead.
+        """
         user = await self._users.get_by_id(user_id)
         if user is None:
             raise NotFoundError
-        if not self._passwords.verify(user.password_hash, password):
-            raise InvalidCredentialsError("Incorrect password.")
+        if password is not None:
+            if not self._passwords.verify(user.password_hash, password):
+                raise InvalidCredentialsError("Incorrect password.")
+        elif reauth_token is None or not await self._reauth.consume(user_id, purpose, reauth_token):
+            raise InvalidCredentialsError("Confirmation is missing or expired.")
         return user
 
-    async def deactivate(self, user_id: uuid.UUID, password: str) -> None:
-        await self._confirm(user_id, password)
+    async def deactivate(
+        self, user_id: uuid.UUID, *, password: str | None = None, reauth_token: str | None = None
+    ) -> None:
+        await self._confirm(user_id, "deactivate", password, reauth_token)
         # Status first: the scheduler and running tasks skip non-active users from here on.
         await self._users.set_status(user_id, UserStatus.DEACTIVATED)
         await self._sessions.revoke_all(user_id)
         await self._audit.record("user.deactivated", user_id=user_id)
 
-    async def delete(self, user_id: uuid.UUID, password: str) -> None:
-        await self._confirm(user_id, password)
+    async def delete(
+        self, user_id: uuid.UUID, *, password: str | None = None, reauth_token: str | None = None
+    ) -> None:
+        await self._confirm(user_id, "delete", password, reauth_token)
         await self._users.set_status(user_id, UserStatus.DELETING)
         await self._sessions.revoke_all(user_id)
         await self._mailboxes.disconnect_all(user_id)
