@@ -34,7 +34,7 @@ test.describe("navigation column", () => {
     }
   });
 
-  test("the open view is a solid accent square with a tooltip on hover and focus", async ({ page }) => {
+  test("the open view is a solid accent square with a tooltip on hover only", async ({ page }) => {
     await mockApi(page);
     await page.goto("/en/mail/starred");
     const rail = page.locator("aside.mf-sidebar");
@@ -57,12 +57,13 @@ test.describe("navigation column", () => {
 
     await rail.getByRole("link", { name: "Sent" }).hover();
     await expect(page.getByRole("tooltip", { name: "Sent" })).toBeVisible();
-    await page.mouse.move(700, 450);
-    // Keyboard users get the same label.
+    await page.mouse.move(700, 450, { steps: 5 });
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
+    // Tooltips open on mouse hover only; keyboard users get the label from the accessible name.
     await rail.getByRole("button", { name: "Compose" }).focus();
     await page.keyboard.press("Tab");
     await expect(rail.getByRole("link", { name: "Inbox, 3 unread" })).toBeFocused();
-    await expect(page.getByRole("tooltip", { name: "Inbox" })).toBeVisible();
+    await expect(page.getByRole("tooltip")).toHaveCount(0);
   });
 
   test("expanding and collapsing moves no icon: one layout in both states", async ({ page }) => {
