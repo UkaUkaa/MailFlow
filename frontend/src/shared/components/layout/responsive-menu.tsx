@@ -11,6 +11,8 @@ import { SheetContent } from "@/shared/components/ui/dialog";
 export interface MenuItem {
   key: string;
   label: string;
+  /** Secondary text at the end of the row (e.g. the time a preset stands for). */
+  hint?: string;
   icon?: LucideIcon;
   onSelect: () => void;
   destructive?: boolean;
@@ -23,14 +25,20 @@ export function ResponsiveMenu({
   items,
   title,
   align = "end",
+  onOpenChange,
 }: {
   trigger: ReactNode;
   items: MenuItem[];
   title: string;
   align?: "start" | "end";
+  onOpenChange?: (open: boolean) => void;
 }) {
   const isPhone = useIsPhone();
-  const [open, setOpen] = useState(false);
+  const [open, setOpenState] = useState(false);
+  const setOpen = (next: boolean) => {
+    setOpenState(next);
+    onOpenChange?.(next);
+  };
 
   if (isPhone) {
     return (
@@ -56,7 +64,8 @@ export function ResponsiveMenu({
                   )}
                 >
                   {item.icon ? <item.icon className="size-5 shrink-0" aria-hidden /> : null}
-                  <span className="min-w-0 break-words">{item.label}</span>
+                  <span className="min-w-0 flex-1 break-words">{item.label}</span>
+                  {item.hint ? <span className="shrink-0 text-sm text-foreground-muted tabular-nums">{item.hint}</span> : null}
                 </button>
               </li>
             ))}
@@ -75,7 +84,7 @@ export function ResponsiveMenu({
           sideOffset={6}
           collisionPadding={8}
           aria-label={title}
-          className="z-50 max-w-[min(20rem,calc(100vw-1rem))] min-w-44 rounded-lg border border-border bg-surface-raised p-1 shadow-sm data-[state=open]:animate-pop-in"
+          className="z-50 max-w-[min(24rem,calc(100vw-1rem))] min-w-44 rounded-lg border border-border bg-surface-raised p-1 shadow-sm data-[state=open]:animate-pop-in"
         >
           {items.map((item) => (
             <DropdownMenu.Item
@@ -88,7 +97,8 @@ export function ResponsiveMenu({
               )}
             >
               {item.icon ? <item.icon className="size-4 shrink-0" aria-hidden /> : null}
-              <span className="min-w-0 break-words">{item.label}</span>
+              <span className={cn("min-w-0 flex-1", item.hint ? "whitespace-nowrap" : "break-words")}>{item.label}</span>
+              {item.hint ? <span className="shrink-0 pl-4 text-[13px] text-foreground-muted tabular-nums">{item.hint}</span> : null}
             </DropdownMenu.Item>
           ))}
         </DropdownMenu.Content>

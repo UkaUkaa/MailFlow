@@ -4,7 +4,7 @@ import type { Account } from "@/modules/accounts";
 import { TooltipProvider } from "@/shared/components/ui/tooltip";
 import { makeAccount } from "@/test/accounts";
 import { renderWithProviders } from "@/test/render";
-import type { ComposeSession } from "../types";
+import type { ComposeSession, SendResult } from "../types";
 import { ComposerPanel } from "./composer-panel";
 
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { success: vi.fn(), error: vi.fn() }) }));
@@ -29,13 +29,19 @@ const session: ComposeSession = {
   forwardAttachments: [],
 };
 
+let sendResult: SendResult;
+const sendCalls = () => fetchMock.mock.calls.filter(([url]) => url === "/api/v1/emails/send");
+const sentPayload = () => JSON.parse(String((sendCalls()[0]?.[1]?.body as FormData).get("payload"))) as Record<string, unknown>;
+
 const draftCalls = () => fetchMock.mock.calls.filter(([url]) => String(url).startsWith("/api/v1/emails/drafts"));
 
 beforeEach(() => {
+  sendResult = { status: "sent", message_id: "m1", thread_id: "t1", outbox_id: null, send_at: null, undo_seconds: 0 };
   fetchMock.mockReset();
   fetchMock.mockImplementation(async (input, init) => {
     const url = String(input);
     if (url === "/api/v1/accounts") return new Response(JSON.stringify({ items: accounts, next_cursor: null }), { status: 200 });
+    if (url === "/api/v1/emails/send") return new Response(JSON.stringify(sendResult), { status: sendResult.status === "sent" ? 200 : 202 });
     if (url === "/api/v1/emails/drafts") {
       const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
       return new Response(JSON.stringify({ id: "draft-1", ...body, updated_at: "2026-11-17T09:00:00Z" }), { status: 201 });
@@ -55,7 +61,7 @@ async function renderComposer() {
   const onClose = vi.fn();
   renderWithProviders(
     <TooltipProvider>
-      <ComposerPanel session={session} onClose={onClose} />
+      <ComposerPanel session={session} onClose={onClose} onSent={vi.fn()} />
     </TooltipProvider>,
   );
   const composer = within(await screen.findByRole("dialog", { name: "New message" }));
@@ -125,7 +131,7 @@ describe("ComposerPanel presentation", () => {
   function renderSession(value: ComposeSession) {
     renderWithProviders(
       <TooltipProvider>
-        <ComposerPanel session={value} onClose={vi.fn()} />
+        <ComposerPanel session={value} onClose={vi.fn()} onSent={vi.fn()} />
       </TooltipProvider>,
     );
   }
@@ -181,12 +187,116 @@ describe("ComposerPanel presentation", () => {
     const onClose = vi.fn();
     renderWithProviders(
       <TooltipProvider>
-        <ComposerPanel session={session} onClose={onClose} />
+        <ComposerPanel session={session} onClose={onClose} onSent={vi.fn()} />
       </TooltipProvider>,
     );
     const panel = await screen.findByRole("dialog", { name: "New message" });
     const body = await within(panel).findByRole("textbox", { name: "Message" });
     fireEvent.keyDown(body, { key: "Escape" });
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+});
+
+describe("ComposerPanel sending", () => {
+  const filled: ComposeSession = {
+    ...session,
+    to: [{ name: "Marta", email: "marta@example.com" }],
+    subject: "Lunch",
+    bodyHtml: "<p>See you at noon.</p>",
+    draftId: "draft-7",
+  };
+
+  function renderFilled(value: ComposeSession = filled) {
+    const onClose = vi.fn();
+    const onSent = vi.fn<(result: SendResult, snapshot: ComposeSession) => void>();
+    renderWithProviders(
+      <TooltipProvider>
+        <ComposerPanel session={value} onClose={onClose} onSent={onSent} />
+      </TooltipProvider>,
+    );
+    return { onClose, onSent };
+  }
+
+  it("closes and hands over the server's answer with its own state, so the send can be undone", async () => {
+    accounts = [makeAccount("acc-1")];
+    sendResult = { status: "undoable", message_id: null, thread_id: null, outbox_id: "out-1", send_at: "2026-11-18T10:00:05Z", undo_seconds: 5 };
+    const { onClose, onSent } = renderFilled();
+    const composer = within(await screen.findByRole("dialog", { name: "New message" }));
+    await composer.findByRole("textbox", { name: "Message" });
+    fireEvent.change(composer.getByLabelText("Subject"), { target: { value: "Lunch on Thursday" } });
+    fireEvent.click(composer.getByRole("button", { name: "Send" }));
+
+    await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(sendCalls()).toHaveLength(1);
+    expect(sentPayload()).toMatchObject({ subject: "Lunch on Thursday", draft_id: "draft-7" });
+    expect(sentPayload()).not.toHaveProperty("send_at");
+    expect((sendCalls()[0]?.[1]?.headers as Record<string, string>)["Idempotency-Key"]).toBe(session.key);
+
+    const [result, snapshot] = onSent.mock.calls[0]!;
+    expect(result).toEqual(sendResult);
+    expect(snapshot).toMatchObject({
+      mode: "new",
+      accountId: "acc-1",
+      to: filled.to,
+      subject: "Lunch on Thursday",
+      bodyHtml: "<p>See you at noon.</p>",
+      draftId: "draft-7",
+      files: [],
+    });
+  });
+
+  it("schedules the send for the time chosen in “Send later”", async () => {
+    accounts = [makeAccount("acc-1")];
+    // Phone: the choices open as a sheet.
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    sendResult = { status: "scheduled", message_id: null, thread_id: null, outbox_id: "out-2", send_at: "2026-11-19T08:00:00Z", undo_seconds: 0 };
+    const { onSent } = renderFilled();
+    const composer = within(await screen.findByRole("dialog", { name: "New message" }));
+    await composer.findByRole("textbox", { name: "Message" });
+
+    fireEvent.click(composer.getByRole("button", { name: "Schedule for later" }));
+    const sheet = within(await screen.findByRole("dialog", { name: "Send later" }));
+    fireEvent.click(sheet.getByRole("button", { name: /Tomorrow morning/ }));
+
+    await waitFor(() => expect(onSent).toHaveBeenCalledTimes(1));
+    const sendAt = new Date(String(sentPayload().send_at));
+    expect(sendAt.getHours()).toBe(8);
+    expect(sendAt.getTime()).toBeGreaterThan(Date.now());
+    expect(String(sentPayload().send_at)).toMatch(/Z$/);
+    expect(onSent.mock.calls[0]?.[0].status).toBe("scheduled");
+  });
+
+  it("starts with the files of a reopened send and treats its content as unsaved", async () => {
+    accounts = [makeAccount("acc-1", { drafts: false }, { provider: "imap" })];
+    const file = new File(["hello"], "notes.txt", { type: "text/plain" });
+    const { onClose } = renderFilled({ ...filled, draftId: null, files: [file], unsaved: true });
+    const composer = within(await screen.findByRole("dialog", { name: "New message" }));
+    expect(composer.getByText("notes.txt")).toBeInTheDocument();
+    await composer.findByRole("note");
+
+    // Nothing was typed, yet closing asks: the message exists only here.
+    fireEvent.click(composer.getAllByRole("button", { name: "Close" })[0]!);
+    expect(await screen.findByRole("dialog", { name: "Discard this message?" })).toBeInTheDocument();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("explains a rejected time and keeps the composer open", async () => {
+    accounts = [makeAccount("acc-1")];
+    fetchMock.mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/v1/accounts") return new Response(JSON.stringify({ items: accounts, next_cursor: null }), { status: 200 });
+      return new Response(
+        JSON.stringify({ error: { code: "validation_error", message: "invalid", details: [{ field: "send_at", code: "in_past" }] } }),
+        { status: 422 },
+      );
+    });
+    const { onClose, onSent } = renderFilled();
+    const composer = within(await screen.findByRole("dialog", { name: "New message" }));
+    await composer.findByRole("textbox", { name: "Message" });
+    fireEvent.click(composer.getByRole("button", { name: "Send" }));
+    expect(await composer.findByRole("alert")).toHaveTextContent("That time has already passed. Choose a later one.");
+    expect(onSent).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

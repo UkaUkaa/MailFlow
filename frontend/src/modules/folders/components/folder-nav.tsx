@@ -3,6 +3,7 @@
 import { Archive, File, Folder as FolderIcon, Inbox, OctagonAlert, Send, Star, Trash2, type LucideIcon } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
+import { Fragment, type ReactNode } from "react";
 import { anyAccountSupports, useAccounts, type CapabilityName } from "@/modules/accounts";
 import { Link } from "@/infrastructure/i18n/navigation";
 import { navGroup, navIcon, navLabel, navRow, navRowBox, navTrailing } from "@/shared/components/layout/nav-row";
@@ -36,8 +37,17 @@ function formatCount(count: number): string {
  * Mail views of the navigation column. One list of rows for both states of the column:
  * collapsed shows the icon cell (unread as a dot, the label as a tooltip), expanded shows the
  * label and the unread count as well. See `shared/components/layout/nav-row.ts`.
+ * `extras` adds rows (`<li>`) owned by other modules after a given view, e.g. Scheduled after Sent.
  */
-export function FolderNav({ onNavigate, expanded = true }: { onNavigate?: () => void; expanded?: boolean }) {
+export function FolderNav({
+  onNavigate,
+  expanded = true,
+  extras,
+}: {
+  onNavigate?: () => void;
+  expanded?: boolean;
+  extras?: Partial<Record<SystemView, ReactNode>>;
+}) {
   const t = useTranslations("nav");
   const params = useParams<{ view?: string }>();
   const searchParams = useSearchParams();
@@ -65,33 +75,36 @@ export function FolderNav({ onNavigate, expanded = true }: { onNavigate?: () => 
           const count = unread(role);
           const label = t(`views.${role}`);
           return (
-            <li key={role}>
-              <Tooltip label={label} side="right" disabled={expanded}>
-                <Link
-                  href={{ pathname: `/mail/${role}`, query }}
-                  aria-current={params.view === role ? "page" : undefined}
-                  aria-label={count > 0 ? t("viewWithUnread", { view: label, count }) : label}
-                  onClick={onNavigate}
-                  className={navRow}
-                >
-                  <span className={navIcon}>
-                    <Icon aria-hidden />
-                    {count > 0 ? (
-                      <span
-                        aria-hidden
-                        className="mf-nav-rail-only absolute top-0.5 right-0.5 size-2 rounded-full border-2 border-rail bg-accent touch:top-2 touch:right-2"
-                      />
-                    ) : null}
-                  </span>
-                  <span className={navLabel}>{label}</span>
-                  {count > 0 ? (
-                    <span aria-hidden className={navTrailing}>
-                      {formatCount(count)}
+            <Fragment key={role}>
+              <li>
+                <Tooltip label={label} side="right" disabled={expanded}>
+                  <Link
+                    href={{ pathname: `/mail/${role}`, query }}
+                    aria-current={params.view === role ? "page" : undefined}
+                    aria-label={count > 0 ? t("viewWithUnread", { view: label, count }) : label}
+                    onClick={onNavigate}
+                    className={navRow}
+                  >
+                    <span className={navIcon}>
+                      <Icon aria-hidden />
+                      {count > 0 ? (
+                        <span
+                          aria-hidden
+                          className="mf-nav-rail-only absolute top-0.5 right-0.5 size-2 rounded-full border-2 border-rail bg-accent touch:top-2 touch:right-2"
+                        />
+                      ) : null}
                     </span>
-                  ) : null}
-                </Link>
-              </Tooltip>
-            </li>
+                    <span className={navLabel}>{label}</span>
+                    {count > 0 ? (
+                      <span aria-hidden className={navTrailing}>
+                        {formatCount(count)}
+                      </span>
+                    ) : null}
+                  </Link>
+                </Tooltip>
+              </li>
+              {extras?.[role] ?? null}
+            </Fragment>
           );
         })}
       </ul>

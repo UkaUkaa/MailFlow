@@ -107,8 +107,8 @@ test.describe("navigation column", () => {
       };
 
       const collapsed = await icons();
-      // toggle, compose, 7 views, all accounts + 2 mailboxes, language, theme, settings
-      expect(collapsed).toHaveLength(15);
+      // toggle, compose, 7 views + Scheduled, all accounts + 2 mailboxes, language, theme, settings
+      expect(collapsed).toHaveLength(16);
       // Every icon is centred on the rail's axis.
       for (const item of collapsed) expect(item.x + item.width / 2, `${item.key} on the rail axis`).toBe(35);
       const toggleBox = await toggle.boundingBox();

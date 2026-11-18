@@ -7,10 +7,13 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { toast } from "sonner";
 import { useAccounts } from "@/modules/accounts";
 import type { Message } from "@/modules/emails";
+import type { OutboxDetail } from "@/modules/outbox";
 import { addressLabel } from "@/shared/types/address";
 import { formatFullDate } from "@/shared/utils/format";
 import { fetchDraft } from "./api";
+import { useSendOutcome } from "./hooks/use-send-outcome";
 import { prefixSubject, quoteMessage, replyRecipients } from "./lib/prefill";
+import { losesAttachments, newSessionKey as newKey, sessionFromOutbox } from "./lib/restore";
 import type { ComposeMode, ComposeSession } from "./types";
 
 // Tiptap and the composer UI are only downloaded when the user first composes.
@@ -23,6 +26,8 @@ interface ComposerApi {
   compose: () => void;
   reply: (message: Message, mode: Exclude<ComposeMode, "new">) => void;
   editDraft: (draftId: string) => void;
+  /** Opens the composer with the content of a scheduled send that was just cancelled. */
+  reopenCancelled: (detail: OutboxDetail) => void;
 }
 
 const ComposerContext = createContext<ComposerApi | null>(null);
@@ -31,10 +36,6 @@ export function useComposer(): ComposerApi {
   const value = useContext(ComposerContext);
   if (!value) throw new Error("useComposer must be used inside ComposerProvider");
   return value;
-}
-
-function newKey(): string {
-  return crypto.randomUUID();
 }
 
 export function ComposerProvider({ children }: { children: ReactNode }) {
@@ -124,15 +125,26 @@ export function ComposerProvider({ children }: { children: ReactNode }) {
     [t],
   );
 
+  const reopenCancelled = useCallback(
+    (detail: OutboxDetail) => {
+      setSession(sessionFromOutbox(detail));
+      if (losesAttachments(detail)) toast(t("attachmentsNotRestored"));
+    },
+    [t],
+  );
+
+  // Lives here, not in the panel: the panel is gone while the undo toast is still on screen.
+  const onSent = useSendOutcome(setSession);
+
   const value = useMemo<ComposerApi>(
-    () => ({ isOpen: session !== null, compose, reply, editDraft }),
-    [session, compose, reply, editDraft],
+    () => ({ isOpen: session !== null, compose, reply, editDraft, reopenCancelled }),
+    [session, compose, reply, editDraft, reopenCancelled],
   );
 
   return (
     <ComposerContext value={value}>
       {children}
-      {session ? <ComposerPanel key={session.key} session={session} onClose={() => setSession(null)} /> : null}
+      {session ? <ComposerPanel key={session.key} session={session} onClose={() => setSession(null)} onSent={onSent} /> : null}
     </ComposerContext>
   );
 }

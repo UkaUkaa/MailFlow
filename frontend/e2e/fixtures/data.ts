@@ -87,7 +87,57 @@ export const settings = {
   account_tint: "subtle",
   accent_color: "blue",
   reader_text_size: "default",
+  // Undo send is off in the fixtures so a plain send is delivered at once; the specs that
+  // exercise the undo window turn it on (the product default is 5 seconds).
+  undo_send_seconds: 0,
 };
+
+/** A scheduled send as `/outbox/{id}` returns it. `undo` marks a send held only for the undo window. */
+export interface OutboxFixture {
+  id: string;
+  account_id: string;
+  status: "pending" | "sending" | "failed" | "sent" | "cancelled";
+  send_at: string;
+  created_at: string;
+  subject: string;
+  to: { email: string; name: string | null }[];
+  cc: { email: string; name: string | null }[];
+  bcc: { email: string; name: string | null }[];
+  snippet: string;
+  attachment_count: number;
+  mode: string;
+  error_code: string | null;
+  body_html: string;
+  source_message_id: string | null;
+  draft_id: string | null;
+  forward_attachment_ids: string[];
+  attachments: { filename: string; mime_type: string; size: number }[];
+  undo?: boolean;
+}
+
+export function makeOutboxItem(id: string, patch: Partial<OutboxFixture> = {}): OutboxFixture {
+  return {
+    id,
+    account_id: "acc-1",
+    status: "pending",
+    send_at: "2027-03-01T08:00:00Z",
+    created_at: "2026-11-17T09:00:00Z",
+    subject: "Quarterly report",
+    to: [{ name: "Marta Shevchenko", email: "marta@studio-north.example" }],
+    cc: [],
+    bcc: [],
+    snippet: "Here is the report we discussed.",
+    attachment_count: 0,
+    mode: "new",
+    error_code: null,
+    body_html: "<p>Here is the report we discussed.</p>",
+    source_message_id: null,
+    draft_id: null,
+    forward_attachment_ids: [],
+    attachments: [],
+    ...patch,
+  };
+}
 
 const people = [
   { name: "Marta Shevchenko", email: "marta@studio-north.example" },

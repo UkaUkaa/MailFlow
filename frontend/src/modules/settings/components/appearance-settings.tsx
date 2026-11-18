@@ -1,11 +1,13 @@
 "use client";
 
-import { ImageOff, Languages, SunMoon } from "lucide-react";
+import { ImageOff, Languages, SunMoon, Undo2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 import { LanguageSwitch, ThemeSwitch } from "@/shared/components/layout/preferences";
 import { Switch } from "@/shared/components/ui/switch";
 import { useSettings, useUpdateSettings } from "../api";
+import { UNDO_SEND_SECONDS } from "../types";
+import { Choice } from "./choice";
 import { SettingsCard, SettingsPage, SettingsRow } from "./settings-section";
 
 export function AppearanceSettings() {
@@ -41,6 +43,17 @@ export function AppearanceSettings() {
             checked={settings.data?.load_remote_images ?? false}
             disabled={!settings.data}
             onCheckedChange={(checked) => update.mutate({ load_remote_images: checked }, { onError })}
+          />
+        </SettingsRow>
+        <SettingsRow icon={Undo2} title={t("undoSend")} description={t("undoSendDescription")}>
+          <Choice
+            label={t("undoSend")}
+            options={UNDO_SEND_SECONDS}
+            value={settings.data?.undo_send_seconds}
+            names={(seconds) => (seconds === 0 ? t("undoSendOff") : t("undoSendShort", { seconds }))}
+            spokenNames={(seconds) => (seconds === 0 ? t("undoSendOff") : t("undoSendSeconds", { seconds }))}
+            disabled={!settings.data}
+            onChange={(undo_send_seconds) => update.mutate({ undo_send_seconds }, { onError })}
           />
         </SettingsRow>
       </SettingsCard>

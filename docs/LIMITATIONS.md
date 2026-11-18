@@ -177,8 +177,12 @@ Honest list of what is missing or partial. Update whenever something here change
 - If a worker dies in the middle of the provider call the item fails with `outcome_unknown`: the
   message may or may not have been sent, and MailFlow does not retry it on its own.
 - Cancelling a scheduled message from the Scheduled view reopens its text in the composer, but
-  files uploaded with it are not restored (they are erased with the cancelled item) and must be
-  attached again. Undo right after sending keeps them.
+  attachments (uploaded files and forwarded ones) are not restored and must be added again; a
+  toast says so. The quoted original comes back as part of the editable body. Undo right after
+  sending restores everything from memory.
+- The undo timer lives in the page: after a reload during the window the message is still sent
+  on time, but there is no Undo toast (cancel is not offered for undo-window items elsewhere).
+  Pressing Undo while another composer is open replaces that composer.
 - A scheduled message that was started from a draft keeps that draft in Drafts until it is sent.
 - Scheduled times are absolute instants; presets are computed in the browser's time zone. There
   is no per-user time-zone setting and no recurring sends. Snooze is not implemented.

@@ -1,6 +1,6 @@
 import type { Page, Request, Route } from "@playwright/test";
 import { samplePng } from "./png";
-import { accounts, imapAccount, type AccountFixture, folderCounts, folders, makeThreadDetail, makeThreads, sessions, settings, user, type ThreadFixture } from "./data";
+import { accounts, imapAccount, type AccountFixture, folderCounts, folders, makeThreadDetail, makeThreads, type OutboxFixture, sessions, settings, user, type ThreadFixture } from "./data";
 
 export interface MockOptions {
   authenticated?: boolean;
@@ -14,6 +14,8 @@ export interface MockOptions {
   expireAfter?: number;
   /** Override saved user settings, e.g. a user who turned remote images off. */
   settings?: Partial<typeof settings>;
+  /** Sends already scheduled (or failed) when the test starts. */
+  outbox?: OutboxFixture[];
 }
 
 export interface RecordedCall {
@@ -27,6 +29,30 @@ export interface MockApi {
   calls: RecordedCall[];
   callsTo: (method: string, path: string | RegExp) => RecordedCall[];
   expireSession: () => void;
+  /** The worker picked every held send up: from now on cancelling is too late. */
+  startSending: () => void;
+}
+
+/** The JSON part of a multipart `/emails/send` body. */
+function sendPayload(body: string | null): Record<string, unknown> {
+  const match = /name="payload"\r\n\r\n([\s\S]*?)\r\n--/.exec(body ?? "");
+  return JSON.parse(match?.[1] ?? "{}") as Record<string, unknown>;
+}
+
+const DETAIL_ONLY = ["body_html", "source_message_id", "draft_id", "forward_attachment_ids", "attachments", "undo"];
+
+/** The list shape: a send without its content. */
+function outboxSummary(item: OutboxFixture) {
+  return Object.fromEntries(Object.entries(item).filter(([key]) => !DETAIL_ONLY.includes(key)));
+}
+
+const YEAR_MS = 366 * 24 * 60 * 60 * 1000;
+
+/** The server's `send_at` rules: in the future, at most a year ahead. */
+function sendAtProblem(value: unknown): "in_past" | "too_far" | null {
+  const time = new Date(String(value)).getTime();
+  if (Number.isNaN(time) || time <= Date.now()) return "in_past";
+  return time > Date.now() + YEAR_MS ? "too_far" : null;
 }
 
 function json(route: Route, status: number, body: unknown, headers: Record<string, string> = {}) {
@@ -56,6 +82,8 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
     threads: makeThreads(45),
     drafts: 0,
     authedCalls: 0,
+    outbox: structuredClone(options.outbox ?? []),
+    outboxIds: 0,
   };
   const calls: RecordedCall[] = [];
   const applyAction = (thread: (typeof state.threads)[number], action: string) => {
@@ -240,7 +268,77 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
       }
       return json(route, 200, makeThreadDetail(thread));
     }
-    if (path === "/emails/send") return json(route, 200, { message_id: "sent-1", thread_id: "thread-sent-1" });
+    if (path === "/emails/send") {
+      const payload = sendPayload(request.postData());
+      const undoSeconds = state.settings.undo_send_seconds;
+      const held = payload.send_at !== undefined || undoSeconds > 0;
+      if (!held) {
+        return json(route, 200, { status: "sent", message_id: "sent-1", thread_id: "thread-sent-1", outbox_id: null, send_at: null, undo_seconds: 0 });
+      }
+      if (payload.send_at !== undefined) {
+        const problem = sendAtProblem(payload.send_at);
+        if (problem) return json(route, 422, { error: { code: "validation_error", message: problem, details: [{ field: "send_at", code: problem }] } });
+      }
+      const scheduled = payload.send_at !== undefined;
+      const files = [...(request.postData() ?? "").matchAll(/name="files"; filename="([^"]*)"/g)].map((match) => match[1] ?? "");
+      const bodyHtml = String(payload.body_html ?? "");
+      const item: OutboxFixture = {
+        id: `out-${++state.outboxIds}`,
+        account_id: String(payload.account_id),
+        status: "pending",
+        send_at: scheduled ? new Date(String(payload.send_at)).toISOString() : new Date(Date.now() + undoSeconds * 1000).toISOString(),
+        created_at: new Date().toISOString(),
+        subject: String(payload.subject ?? ""),
+        to: (payload.to ?? []) as OutboxFixture["to"],
+        cc: (payload.cc ?? []) as OutboxFixture["cc"],
+        bcc: (payload.bcc ?? []) as OutboxFixture["bcc"],
+        snippet: bodyHtml.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 120),
+        attachment_count: files.length + ((payload.forward_attachment_ids as string[] | undefined)?.length ?? 0),
+        mode: String(payload.mode ?? "new"),
+        error_code: null,
+        body_html: bodyHtml,
+        source_message_id: (payload.source_message_id as string | undefined) ?? null,
+        draft_id: (payload.draft_id as string | undefined) ?? null,
+        forward_attachment_ids: (payload.forward_attachment_ids as string[] | undefined) ?? [],
+        attachments: files.map((filename) => ({ filename, mime_type: "application/octet-stream", size: 1 })),
+        undo: !scheduled,
+      };
+      state.outbox.push(item);
+      return json(route, 202, {
+        status: scheduled ? "scheduled" : "undoable",
+        message_id: null,
+        thread_id: null,
+        outbox_id: item.id,
+        send_at: item.send_at,
+        undo_seconds: scheduled ? 0 : undoSeconds,
+      });
+    }
+    if (path === "/outbox") {
+      const items = state.outbox
+        .filter((item) => !item.undo && ["pending", "sending", "failed"].includes(item.status))
+        .sort((a, b) => a.send_at.localeCompare(b.send_at));
+      return json(route, 200, { items: items.map(outboxSummary) });
+    }
+    const outboxMatch = /^\/outbox\/([^/]+)(\/cancel)?$/.exec(path);
+    if (outboxMatch) {
+      const item = state.outbox.find((candidate) => candidate.id === outboxMatch[1]);
+      if (!item) return error(route, 404, "not_found");
+      const open = item.status === "pending" || item.status === "failed";
+      if (outboxMatch[2]) {
+        if (!open) return error(route, 409, "outbox_not_cancellable");
+        item.status = "cancelled";
+        return json(route, 200, { ...item, undo: undefined });
+      }
+      if (method === "PATCH") {
+        if (!open) return error(route, 409, "outbox_not_editable");
+        const body = request.postDataJSON() as { send_at: string };
+        const problem = sendAtProblem(body.send_at);
+        if (problem) return json(route, 422, { error: { code: "validation_error", message: problem, details: [{ field: "send_at", code: problem }] } });
+        Object.assign(item, { send_at: new Date(body.send_at).toISOString(), status: "pending", error_code: null });
+        return json(route, 200, outboxSummary(item));
+      }
+      return json(route, 200, { ...item, undo: undefined });
+    }
     if (path.startsWith("/emails/drafts")) {
       if (method === "DELETE") return route.fulfill({ status: 204, body: "" });
       const body = (method === "GET" ? {} : request.postDataJSON()) as Record<string, unknown>;
@@ -270,6 +368,9 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
       calls.filter((call) => call.method === method && (typeof path === "string" ? call.path === path : path.test(call.path))),
     expireSession: () => {
       state.authenticated = false;
+    },
+    startSending: () => {
+      for (const item of state.outbox) if (item.status === "pending") item.status = "sending";
     },
   };
 }

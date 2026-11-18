@@ -379,11 +379,26 @@
         "provider_unavailable": "The mail provider is not responding. Your message was not sent.",
         "provider_rate_limited": "The mail provider is limiting requests. Try again in a minute.",
         "network_error": "You appear to be offline. Your message was not sent.",
-        "unknown": "The message could not be sent. Please try again."
+        "unknown": "The message could not be sent. Please try again.",
+        "too_many_scheduled": "You have too many scheduled messages. Send or cancel some of them first.",
+        "send_at_in_past": "That time has already passed. Choose a later one.",
+        "send_at_too_far": "Messages can be scheduled up to one year ahead."
       }
     },
     "dock": "Dock",
-    "recipientsPlaceholder": "To, Cc, Bcc"
+    "recipientsPlaceholder": "To, Cc, Bcc",
+    "sendLater": "Send later",
+    "scheduleLabel": "Schedule for later",
+    "scheduleSend": "Schedule send",
+    "scheduled": "Send scheduled",
+    "scheduledFor": "Send scheduled for {date}",
+    "attachmentsNotRestored": "Attachments were not restored. Add them again before sending.",
+    "undo": {
+      "action": "Undo",
+      "sending": "Sending…",
+      "tooLate": "Too late — the message was already sent",
+      "failed": "The send could not be undone. Check Scheduled or Sent."
+    }
   },
   "auth": {
     "backToLogin": "Back to sign in",
@@ -517,7 +532,12 @@
       "language": "Language",
       "languageDescription": "Used for the interface and for emails MailFlow sends you.",
       "remoteImages": "Always show remote images",
-      "remoteImagesDescription": "On by default. Turn off to block them: remote images can tell senders when you open their email."
+      "remoteImagesDescription": "On by default. Turn off to block them: remote images can tell senders when you open their email.",
+      "undoSend": "Undo send",
+      "undoSendDescription": "After you press Send, the message waits this long so you can take it back.",
+      "undoSendOff": "Off",
+      "undoSendShort": "{seconds} s",
+      "undoSendSeconds": "{seconds, plural, one {# second} other {# seconds}}"
     },
     "interface": {
       "title": "Interface",
@@ -743,6 +763,54 @@
             "p1": "We may update these terms; the date above shows the current version, and significant changes will be announced in the app. Questions: <email></email>."
           }
         }
+      }
+    }
+  },
+  "outbox": {
+    "title": "Scheduled",
+    "navWithCount": "Scheduled, {count, plural, one {# message} other {# messages}}",
+    "count": "{count, plural, =0 {Nothing scheduled} one {# message} other {# messages}}",
+    "to": "To: {recipients}",
+    "noRecipients": "No recipients",
+    "noSubject": "(no subject)",
+    "attachments": "{count, plural, one {# attachment} other {# attachments}}",
+    "sendsAt": "Sends {date}",
+    "sendingNow": "Sending now…",
+    "failed": {
+      "provider_auth_required": "Couldn't send. Reconnect the mailbox and retry.",
+      "generic": "Couldn't send this message."
+    },
+    "reschedule": "Reschedule",
+    "retry": "Retry",
+    "rescheduleTitle": "Reschedule send",
+    "rescheduled": "Send rescheduled for {date}",
+    "cancelSend": "Cancel send",
+    "cancelTitle": "Cancel this send?",
+    "cancelDescription": "The message will not be sent. It opens in the composer so you can edit it or send it again.",
+    "keepScheduled": "Keep scheduled",
+    "emptyTitle": "Nothing scheduled",
+    "emptyDescription": "Messages you choose to send later wait here until their time.",
+    "errors": {
+      "tooLate": "Too late — the message was already sent",
+      "notEditable": "This message is already being sent and can no longer be changed.",
+      "in_past": "That time has already passed. Choose a later one.",
+      "too_far": "Messages can be scheduled up to one year ahead.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "sendLater": {
+      "presets": {
+        "laterToday": "Later today",
+        "tomorrowMorning": "Tomorrow morning",
+        "mondayMorning": "Monday morning"
+      },
+      "custom": "Pick date & time",
+      "customTitle": "Pick date & time",
+      "customDescription": "Times are in your device's time zone.",
+      "customLabel": "Date and time",
+      "problems": {
+        "invalid": "Choose a date and time.",
+        "in_past": "Choose a time in the future.",
+        "too_far": "Choose a time within one year from now."
       }
     }
   }

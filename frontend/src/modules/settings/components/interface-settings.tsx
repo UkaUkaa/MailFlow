@@ -4,12 +4,10 @@ import { Check, LayoutList, Palette, RotateCcw, Rows3, SquareUserRound, Text, Ty
 import { useFormatter, useTranslations } from "next-intl";
 import type { CSSProperties } from "react";
 import { toast } from "sonner";
-import { group, segment } from "@/shared/components/ui/segmented";
 import { Avatar } from "@/shared/components/ui/avatar";
 import { Button } from "@/shared/components/ui/button";
 import { Switch } from "@/shared/components/ui/switch";
 import { ACCOUNT_COLORS } from "@/shared/constants/account-colors";
-import { cn } from "@/shared/lib/cn";
 import {
   ACCENT_COLORS,
   ACCOUNT_TINTS,
@@ -21,41 +19,8 @@ import {
   type InterfacePreferences,
 } from "@/shared/lib/interface-preferences";
 import { useSettings, useUpdateSettings } from "../api";
+import { Choice } from "./choice";
 import { SettingsCard, SettingsPage, SettingsRow } from "./settings-section";
-
-/** Segmented control with the same look as the theme and language switches. */
-function Choice<T extends string | number>({
-  label,
-  options,
-  value,
-  names,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  options: readonly T[];
-  value: T | undefined;
-  names: (option: T) => string;
-  disabled: boolean;
-  onChange: (option: T) => void;
-}) {
-  return (
-    <div role="group" aria-label={label} className={cn(group, "w-full sm:w-auto")}>
-      {options.map((option) => (
-        <button
-          key={option}
-          type="button"
-          aria-pressed={value === option}
-          disabled={disabled}
-          onClick={() => onChange(option)}
-          className={cn(segment, "disabled:opacity-50")}
-        >
-          <span className="truncate">{names(option)}</span>
-        </button>
-      ))}
-    </div>
-  );
-}
 
 /**
  * Two sample rows styled by the same `<html>` variants as the real message list, so every
