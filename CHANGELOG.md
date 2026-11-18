@@ -3,6 +3,13 @@
 ## [Unreleased]
 
 ### Added
+- Real delivery of verification and password reset emails. `SMTP_TLS` adds implicit TLS
+  (port 465) next to `SMTP_STARTTLS`; messages carry `Date`, `Message-ID` and
+  `Auto-Submitted` headers so receiving servers accept them. Production refuses to start
+  when `SMTP_HOST` is empty, Mailpit or loopback, or when SMTP is unencrypted.
+- System mail is sent after the HTTP response (FastAPI background task), so a slow SMTP
+  server neither delays registration/reset nor makes their timing depend on whether the
+  address is registered.
 - Sign in with Google: "Continue with Google" on the sign-in and registration screens (shown
   only when `GOOGLE_CLIENT_ID`/`SECRET` are set; `GET /auth/providers`). OpenID Connect with
   state, PKCE and nonce; the state is single-use (Redis) and bound to the browser by an HttpOnly
