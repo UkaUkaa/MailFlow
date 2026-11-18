@@ -6,6 +6,7 @@ from app.modules.audit.infrastructure import AuditEventModel
 from app.modules.authentication.infrastructure.models import (
     EmailVerificationTokenModel,
     PasswordResetTokenModel,
+    UserIdentityModel,
     UserSessionModel,
 )
 from app.modules.email_accounts.infrastructure.models import EmailAccountModel, OAuthStateModel
@@ -29,6 +30,7 @@ __all__ = [
     "OAuthStateModel",
     "PasswordResetTokenModel",
     "SyncStateModel",
+    "UserIdentityModel",
     "UserModel",
     "UserSessionModel",
     "UserSettingsModel",

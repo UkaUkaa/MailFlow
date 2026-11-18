@@ -12,6 +12,7 @@ import { Field } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
 import { useRegister, useResendVerification } from "../api";
 import { registerSchema, type RegisterValues } from "../schemas";
+import { GoogleSignIn } from "./google-sign-in";
 import { AuthHeading, FormAlert } from "./auth-shell";
 
 export function CheckEmailNotice({ email }: { email: string }) {
@@ -73,6 +74,7 @@ export function RegisterForm() {
   return (
     <>
       <AuthHeading title={t("register.title")} description={t("register.description")} />
+      <GoogleSignIn />
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {registration.error ? <FormAlert>{te(errorKey(registration.error))}</FormAlert> : null}
         <Field label={t("fields.name")} htmlFor="register-name" error={message(errors.display_name?.message)}>

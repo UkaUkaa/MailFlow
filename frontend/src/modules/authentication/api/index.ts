@@ -91,3 +91,14 @@ export function useRevokeOtherSessions() {
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: authKeys.sessions() }),
   });
 }
+
+const signInProvidersSchema = z.object({ google: z.boolean() });
+
+/** External sign-in methods configured on this deployment (hides buttons that cannot work). */
+export function useSignInProviders() {
+  return useQuery({
+    queryKey: ["auth", "providers"] as const,
+    queryFn: ({ signal }) => api.get("/auth/providers", signInProvidersSchema, { signal, skipAuthRedirect: true }),
+    staleTime: 5 * 60_000,
+  });
+}

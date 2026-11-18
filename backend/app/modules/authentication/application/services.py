@@ -168,7 +168,16 @@ class SessionService:
             raise EmailNotVerifiedError
         if self._hasher.needs_rehash(user.password_hash):
             await self._users.set_password(user.id, self._hasher.hash(password))
-        token = self._tf.generate()
+        token = await self.open_session(
+            user, ip_address=ip_address, user_agent=user_agent, method="password"
+        )
+        return user, token
+
+    async def open_session(
+        self, user: User, *, ip_address: str | None, user_agent: str | None, method: str
+    ) -> str:
+        """Create a session for an already authenticated user and return its raw token."""
+        token: str = self._tf.generate()
         now = self._clock.now()
         await self._sessions.add(
             user_id=user.id,
@@ -178,8 +187,10 @@ class SessionService:
             user_agent=user_agent,
             ip_address=ip_address,
         )
-        await self._audit.record("auth.login", user_id=user.id, ip_address=ip_address)
-        return user, token
+        await self._audit.record(
+            "auth.login", user_id=user.id, ip_address=ip_address, metadata={"method": method}
+        )
+        return token
 
     async def authenticate(self, token: str | None) -> AuthContext | None:
         """Resolve a raw session token to a principal, or None. Never raises for bad tokens."""

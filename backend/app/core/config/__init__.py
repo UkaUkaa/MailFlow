@@ -148,6 +148,11 @@ class Settings(BaseSettings):
         )
 
     @property
+    def google_sign_in_redirect_uri(self) -> str:
+        """Callback for "Sign in with Google" (MailFlow login, not mailbox access)."""
+        return f"{self.app_base_url}/api/v1/auth/oauth/google/callback"
+
+    @property
     def gmail_configured(self) -> bool:
         return bool(self.google_client_id and self.google_client_secret.get_secret_value())
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Index, String
+from sqlalchemy import DateTime, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -47,3 +47,21 @@ class EmailVerificationTokenModel(_OneTimeTokenMixin, Base):
 class PasswordResetTokenModel(_OneTimeTokenMixin, Base):
     __tablename__ = "password_reset_tokens"
     user_id: Mapped[uuid.UUID] = _user_fk()
+
+
+class UserIdentityModel(Base):
+    """Links a MailFlow user to an external sign-in identity (e.g. a Google account ``sub``).
+
+    Not under tenant RLS, like ``user_sessions``: it is read before anyone is authenticated,
+    and only through ``(provider, subject)`` returned by a validated provider exchange.
+    """
+
+    __tablename__ = "user_identities"
+    __table_args__ = (UniqueConstraint("provider", "subject"),)
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = _user_fk()
+    provider: Mapped[str] = mapped_column(String(20), nullable=False)
+    subject: Mapped[str] = mapped_column(String(255), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    created_at: Mapped[datetime] = created_at_column()

@@ -63,7 +63,7 @@ Requirements:
 | `REDIS_PASSWORD` | yes | — | |
 | `VAULT_KEYS` | yes | — | `key_id:base64(32 bytes)` pairs, comma separated |
 | `VAULT_PRIMARY_KEY_ID` | no | first key | Key used for new encryption |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | empty | Enables Gmail |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | empty | Enables Gmail and "Sign in with Google". Register both redirect URIs: `{APP_BASE_URL}/api/v1/accounts/oauth/gmail/callback` and `{APP_BASE_URL}/api/v1/auth/oauth/google/callback` |
 | `GOOGLE_REDIRECT_URI` | no | derived | Override of the OAuth redirect URI |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | no | empty | Enables Outlook / Microsoft 365 (Microsoft Graph) |
 | `MICROSOFT_TENANT` | no | `common` | `common` (work, school and personal accounts), `organizations`, `consumers` or a tenant id |

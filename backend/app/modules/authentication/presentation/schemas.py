@@ -74,3 +74,9 @@ class SessionResponse(BaseModel):
 
 class SessionList(BaseModel):
     items: list[SessionResponse]
+
+
+class SignInProviders(BaseModel):
+    """External sign-in methods that are configured on this deployment."""
+
+    google: bool

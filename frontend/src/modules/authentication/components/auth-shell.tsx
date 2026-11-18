@@ -4,6 +4,7 @@ import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { LanguageSwitch, ThemeSwitch } from "@/shared/components/layout/preferences";
 import { BrandMark } from "@/shared/components/layout/brand";
+import { LegalLinks } from "@/modules/legal";
 
 /** Frame for every signed-out screen: brand, language and theme controls, centred card. */
 export function AuthShell({ children }: { children: ReactNode }) {
@@ -20,11 +21,14 @@ export function AuthShell({ children }: { children: ReactNode }) {
           />
         </div>
       </header>
-      <main className="flex flex-1 items-center justify-center px-4 py-8 pb-[max(2rem,env(safe-area-inset-bottom))] sm:px-6">
+      <main className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6">
         <div className="w-full max-w-[26rem] rounded-xl border border-border bg-surface-raised p-6 shadow-sm sm:p-8">
           {children}
         </div>
       </main>
+      <footer className="px-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+        <LegalLinks />
+      </footer>
     </div>
   );
 }

@@ -6,6 +6,8 @@ import { renderWithProviders } from "@/test/render";
 import { LoginForm } from "./login-form";
 
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
+// The Google button has its own tests; here it would add a provider lookup to the fetch log.
+vi.mock("./google-sign-in", () => ({ GoogleSignIn: () => null }));
 vi.mock("@/infrastructure/i18n/navigation", () => ({
   Link: ({ href, children, ...props }: { href: string; children: React.ReactNode }) => (
     <a href={href} {...props}>
