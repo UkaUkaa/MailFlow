@@ -190,3 +190,40 @@ test.describe("reading", () => {
     await expect(page.getByText("Daniel Okafor <daniel@okafor.example>").first()).toBeVisible();
   });
 });
+
+test.describe("selection", () => {
+  test("selects several conversations, marks them read, then moves them to trash", async ({ page }) => {
+    const api = await mockApi(page);
+    await page.goto("/en/mail/inbox");
+    await page.getByRole("button", { name: "Select conversations" }).click();
+    const list = page.getByRole("list", { name: "Inbox" });
+    const boxes = list.getByRole("checkbox");
+    await boxes.nth(0).click();
+    await boxes.nth(1).click();
+    await expect(page.getByRole("heading", { level: 1, name: "2 selected" })).toBeVisible();
+    await expect(boxes.nth(0)).toHaveAttribute("aria-checked", "true");
+
+    const toolbar = page.getByRole("toolbar", { name: "Actions for selected conversations" });
+    await toolbar.getByRole("button", { name: "Mark as read" }).click();
+    await expect
+      .poll(() => api.callsTo("POST", "/threads/actions").map((call) => JSON.parse(call.body ?? "{}") as unknown))
+      .toContainEqual({ thread_ids: ["thread-1", "thread-2"], action: "mark_read" });
+    // Read changes keep the selection, so a further action can follow.
+    await expect(toolbar.getByRole("button", { name: "Mark as unread" })).toBeVisible();
+
+    await toolbar.getByRole("button", { name: "Move to trash" }).click();
+    await expect(page.getByText("2 conversations moved to trash")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Select conversations" })).toBeVisible();
+    await expect(list.locator('a[href$="/mail/inbox/thread-1"]')).toHaveCount(0);
+  });
+
+  test("selects all loaded conversations and leaves with Escape", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/en/mail/inbox");
+    await page.getByRole("button", { name: "Select conversations" }).click();
+    await page.getByRole("button", { name: "Select all" }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "30 selected" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("list", { name: "Inbox" }).getByRole("checkbox")).toHaveCount(0);
+  });
+});

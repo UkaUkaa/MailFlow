@@ -209,7 +209,9 @@ instead of being offered and rejected with `422 unsupported`:
 
 - Draft attachments are not persisted (matches decision D9); reopening a saved draft loads the
   quoted text into the editor, which simplifies complex quoted markup.
-- No offline support, keyboard-shortcut layer, bulk selection or swipe gestures yet.
+- No offline support, keyboard-shortcut layer or swipe gestures yet.
+- Bulk selection (`modules/inbox`: `useThreadSelection`, `bulkActions`, `SelectionBar`) selects
+  only loaded conversations; see `docs/LIMITATIONS.md`.
 - Pin, snooze, assign, share, AI, calendar, priority and smart category cards of the reference
   are not present: MailFlow has no such features (D31).
 - After changing `globals.css`, delete `.next` before `pnpm build`: the Turbopack cache has

@@ -54,6 +54,13 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
     authedCalls: 0,
   };
   const calls: RecordedCall[] = [];
+  const applyAction = (thread: (typeof state.threads)[number], action: string) => {
+    if (action === "mark_read") thread.is_unread = false;
+    if (action === "mark_unread") thread.is_unread = true;
+    if (action === "star") thread.is_starred = true;
+    if (action === "unstar") thread.is_starred = false;
+    if (["archive", "trash", "spam"].includes(action)) state.threads = state.threads.filter((item) => item.id !== thread.id);
+  };
   // Accounts with a picture. Every picture is served as the same generated PNG; tests assert on
   // the upload request itself.
   const avatars = new Set(state.accounts.filter((account) => account.avatar_updated_at).map((account) => account.id));
@@ -212,8 +219,10 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
       return json(route, 200, { items: items.slice(start, start + limit), next_cursor: next });
     }
     if (path === "/threads/actions") {
-      const body = request.postDataJSON() as { thread_ids: string[] };
-      return json(route, 200, { updated: body.thread_ids });
+      const body = request.postDataJSON() as { thread_ids: string[]; action: string };
+      const targets = state.threads.filter((item) => body.thread_ids.includes(item.id));
+      for (const thread of targets) applyAction(thread, body.action);
+      return json(route, 200, { updated: targets.map((item) => item.id) });
     }
     const threadMatch = /^\/threads\/([^/]+)(\/actions)?$/.exec(path);
     if (threadMatch) {
@@ -221,11 +230,7 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
       if (!thread) return error(route, 404, "not_found");
       if (threadMatch[2]) {
         const { action } = request.postDataJSON() as { action: string };
-        if (action === "mark_read") thread.is_unread = false;
-        if (action === "mark_unread") thread.is_unread = true;
-        if (action === "star") thread.is_starred = true;
-        if (action === "unstar") thread.is_starred = false;
-        if (["archive", "trash", "spam"].includes(action)) state.threads = state.threads.filter((item) => item.id !== thread.id);
+        applyAction(thread, action);
         return json(route, 200, thread);
       }
       return json(route, 200, makeThreadDetail(thread));

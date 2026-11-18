@@ -228,6 +228,15 @@
       "yesterday": "Yesterday",
       "thisWeek": "This week",
       "lastWeek": "Last week"
+    },
+    "selection": {
+      "start": "Select conversations",
+      "prompt": "Select conversations",
+      "count": "{count, plural, one {# selected} other {# selected}}",
+      "cancel": "Cancel selection",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "toolbar": "Actions for selected conversations"
     }
   },
   "reader": {

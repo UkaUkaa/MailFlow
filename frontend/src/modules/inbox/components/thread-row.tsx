@@ -1,8 +1,8 @@
 "use client";
 
-import { Archive, Mail, MailOpen, Paperclip, Pencil, Star, Trash2 } from "lucide-react";
+import { Archive, Check, Mail, MailOpen, Paperclip, Pencil, Star, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { memo, useState, type CSSProperties, type FocusEvent } from "react";
+import { memo, useCallback, useState, type CSSProperties, type FocusEvent } from "react";
 import { AccountDot } from "@/modules/accounts";
 import type { ThreadAction, ThreadSummary } from "@/modules/emails";
 import { Link } from "@/infrastructure/i18n/navigation";
@@ -10,6 +10,7 @@ import { Avatar } from "@/shared/components/ui/avatar";
 import { cn } from "@/shared/lib/cn";
 import { addressLabel } from "@/shared/types/address";
 import { formatListDate } from "@/shared/utils/format";
+import { useLongPress } from "../hooks/use-long-press";
 
 function senders(thread: ThreadSummary, fallback: string): string {
   const names = thread.participants.map(addressLabel);
@@ -29,6 +30,12 @@ interface ThreadRowProps {
   /** Whether the thread's mailbox can archive; the quick action is left out when it cannot. */
   canArchive: boolean;
   onAction: (action: ThreadAction, threadId: string) => void;
+  /** Selection mode: the row toggles its checkbox instead of opening the conversation. */
+  selectionMode?: boolean;
+  checked?: boolean;
+  onToggleSelect?: (threadId: string) => void;
+  /** Touch long-press; the list uses it to enter selection mode with this row selected. */
+  onLongPress?: (threadId: string) => void;
 }
 
 function QuickAction({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
@@ -42,6 +49,39 @@ function QuickAction({ label, onClick, children }: { label: string; onClick: () 
     >
       {children}
     </button>
+  );
+}
+
+const ROW_TARGET =
+  "flex min-h-[88px] w-full min-w-0 py-3 pr-5 text-left -outline-offset-2 select-none [-webkit-touch-callout:none] preview-none:min-h-[76px] compact:min-h-[60px] compact:py-2 compact:preview-none:min-h-[60px]";
+
+/** The row's main control: a link to the conversation, or a checkbox while selecting. */
+function RowTarget({
+  selectionMode,
+  checked,
+  href,
+  current,
+  onToggle,
+  children,
+}: {
+  selectionMode: boolean;
+  checked: boolean;
+  href: string;
+  current: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  if (selectionMode) {
+    return (
+      <button type="button" role="checkbox" aria-checked={checked} onClick={onToggle} className={ROW_TARGET}>
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link href={href} aria-current={current ? "true" : undefined} className={ROW_TARGET}>
+      {children}
+    </Link>
   );
 }
 
@@ -73,6 +113,10 @@ export const ThreadRow = memo(function ThreadRow({
   showAccount,
   canArchive,
   onAction,
+  selectionMode = false,
+  checked = false,
+  onToggleSelect,
+  onLongPress,
 }: ThreadRowProps) {
   const t = useTranslations("mail");
   const locale = useLocale();
@@ -92,7 +136,13 @@ export const ThreadRow = memo(function ThreadRow({
 
   // The whole row carries a faint wash of its mailbox's colour (`.account-tint`, globals.css).
   // Selection keeps its own fill so the open conversation is always unmistakable.
-  const tinted = Boolean(accountColor) && !selected;
+  const tinted = Boolean(accountColor) && !selected && !checked;
+  const longPress = useLongPress(
+    useCallback(() => {
+      if (selectionMode) onToggleSelect?.(thread.id);
+      else onLongPress?.(thread.id);
+    }, [selectionMode, onToggleSelect, onLongPress, thread.id]),
+  );
 
   return (
     <li
@@ -100,29 +150,40 @@ export const ThreadRow = memo(function ThreadRow({
       onFocus={onFocus}
       onBlur={onBlur}
       style={tinted ? ({ "--account-tint": accountColor } as CSSProperties) : undefined}
-      className={cn("group relative", selected ? "bg-accent-soft" : tinted ? "account-tint" : "hover:bg-muted/60")}
+      className={cn("group relative", selected || checked ? "bg-accent-soft" : tinted ? "account-tint" : "hover:bg-muted/60")}
+      {...(onLongPress || selectionMode ? longPress : {})}
     >
-      <Link
-        href={href}
-        aria-current={selected ? "true" : undefined}
-        className="flex min-h-[88px] min-w-0 py-3 pr-5 -outline-offset-2 preview-none:min-h-[76px] compact:min-h-[60px] compact:py-2 compact:preview-none:min-h-[60px]"
-      >
-        <span className={cn("flex shrink-0", CONCEAL_ON_HOVER, keyboardFocus && "invisible")}>
-          <span className="flex w-[30px] shrink-0 justify-center pt-[11px]">
-            {unread ? (
-              <span className="size-2 rounded-full bg-accent">
-                <span className="sr-only">{t("unread")}</span>
-              </span>
-            ) : null}
-          </span>
-          {isDraft ? (
-            <span aria-hidden className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-border-strong text-foreground-muted no-avatars:hidden">
-              <Pencil className="size-3.5" />
+      <RowTarget selectionMode={selectionMode} checked={checked} href={href} current={selected} onToggle={() => onToggleSelect?.(thread.id)}>
+        {selectionMode ? (
+          <span className="flex w-[58px] shrink-0 justify-center pt-[3px] no-avatars:w-[34px]">
+            <span
+              aria-hidden
+              className={cn(
+                "inline-flex size-5 items-center justify-center rounded-[5px] border transition-colors",
+                checked ? "border-accent bg-accent text-accent-foreground" : "border-border-strong bg-background",
+              )}
+            >
+              {checked ? <Check className="size-3.5" strokeWidth={3} /> : null}
             </span>
-          ) : (
-            <Avatar name={first ? addressLabel(first) : ""} colorKey={first?.email ?? ""} className="mt-0.5 no-avatars:hidden" />
-          )}
-        </span>
+          </span>
+        ) : (
+          <span className={cn("flex shrink-0", CONCEAL_ON_HOVER, keyboardFocus && "invisible")}>
+            <span className="flex w-[30px] shrink-0 justify-center pt-[11px]">
+              {unread ? (
+                <span className="size-2 rounded-full bg-accent">
+                  <span className="sr-only">{t("unread")}</span>
+                </span>
+              ) : null}
+            </span>
+            {isDraft ? (
+              <span aria-hidden className="mt-0.5 inline-flex size-7 shrink-0 items-center justify-center rounded-full border border-border-strong text-foreground-muted no-avatars:hidden">
+                <Pencil className="size-3.5" />
+              </span>
+            ) : (
+              <Avatar name={first ? addressLabel(first) : ""} colorKey={first?.email ?? ""} className="mt-0.5 no-avatars:hidden" />
+            )}
+          </span>
+        )}
         <span className="ml-1 flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex min-w-0 items-baseline gap-2">
             <span className={cn("min-w-0 flex-1 truncate text-sm font-semibold", unread || selected ? "text-foreground" : "text-foreground/85")}>
@@ -167,8 +228,32 @@ export const ThreadRow = memo(function ThreadRow({
             {showAccount ? <AccountDot color={accountColor} imageUrl={accountImageUrl} className="preview-two:mt-1.5" imageClassName="preview-two:mt-0.5" /> : null}
           </span>
         </span>
-      </Link>
+      </RowTarget>
 
+      {selectionMode ? null : (
+        <RowActions thread={thread} view={view} canArchive={canArchive} keyboardFocus={keyboardFocus} onAction={onAction} />
+      )}
+    </li>
+  );
+});
+
+function RowActions({
+  thread,
+  view,
+  canArchive,
+  keyboardFocus,
+  onAction,
+}: {
+  thread: ThreadSummary;
+  view: string;
+  canArchive: boolean;
+  keyboardFocus: boolean;
+  onAction: (action: ThreadAction, threadId: string) => void;
+}) {
+  const t = useTranslations("mail");
+  const unread = thread.is_unread;
+  return (
+    <>
       <button
         type="button"
         aria-pressed={thread.is_starred}
@@ -208,6 +293,6 @@ export const ThreadRow = memo(function ThreadRow({
           </QuickAction>
         ) : null}
       </div>
-    </li>
+    </>
   );
-});
+}

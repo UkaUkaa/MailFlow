@@ -228,6 +228,15 @@
       "yesterday": "Учора",
       "thisWeek": "Цього тижня",
       "lastWeek": "Минулого тижня"
+    },
+    "selection": {
+      "start": "Вибрати розмови",
+      "prompt": "Виберіть розмови",
+      "count": "{count, plural, one {Вибрано #} few {Вибрано #} many {Вибрано #} other {Вибрано #}}",
+      "cancel": "Скасувати вибір",
+      "selectAll": "Вибрати всі",
+      "deselectAll": "Зняти вибір з усіх",
+      "toolbar": "Дії з вибраними розмовами"
     }
   },
   "reader": {
