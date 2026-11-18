@@ -74,7 +74,7 @@ Details: `docs/architecture/DATA_OWNERSHIP.md`, `docs/SECURITY.md`.
 - Provider credentials live only in the Token Vault (AES-256-GCM, keys from environment).
 - Never log passwords, tokens, cookies, email bodies or attachment content.
 - All email HTML is untrusted: sanitized server-side, rendered in a sandboxed iframe, remote
-  images blocked by default.
+  images shown by default with a per-user switch to block them (D41).
 - User-supplied hosts (IMAP/SMTP) go through the SSRF guard — resolve, validate every IP, connect
   to the validated IP.
 - No hidden administrative access to mail content.

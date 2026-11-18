@@ -28,7 +28,7 @@ CHOICES: dict[str, tuple[object, ...]] = {
 class UserSettings:
     locale: str = "en"
     theme: str = "system"
-    load_remote_images: bool = False
+    load_remote_images: bool = True
     conversation_view: bool = True
     list_density: str = "comfortable"
     list_preview_lines: int = 1

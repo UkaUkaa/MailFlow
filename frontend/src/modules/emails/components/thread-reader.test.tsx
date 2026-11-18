@@ -18,8 +18,11 @@ vi.mock("@/infrastructure/i18n/navigation", () => ({
   useRouter: () => ({ push }),
 }));
 vi.mock("@/modules/composer", () => ({ useComposer: () => ({ reply: vi.fn(), editDraft: vi.fn(), compose: vi.fn(), isOpen: false }) }));
-vi.mock("@/modules/settings", () => ({ useSettings: () => ({ data: { load_remote_images: false } }) }));
-vi.mock("./message-card", () => ({ MessageCard: () => <div data-testid="message" /> }));
+const userSettings = vi.hoisted(() => ({ data: { load_remote_images: true } as { load_remote_images: boolean } | undefined }));
+vi.mock("@/modules/settings", () => ({ useSettings: () => userSettings }));
+vi.mock("./message-card", () => ({
+  MessageCard: ({ alwaysShowImages }: { alwaysShowImages: boolean }) => <div data-testid="message" data-images={String(alwaysShowImages)} />,
+}));
 
 const thread = {
   id: "t1",
@@ -32,7 +35,28 @@ const thread = {
   is_unread: false,
   is_starred: false,
   last_message_at: "2026-11-17T09:00:00Z",
-  messages: [],
+  messages: [
+    {
+      id: "m1",
+      thread_id: "t1",
+      account_id: "acc-1",
+      from: { name: "Marta", email: "marta@example.com" },
+      to: [{ name: "Olena", email: "olena@example.com" }],
+      cc: [],
+      bcc: [],
+      reply_to: [],
+      subject: "Quarterly numbers",
+      snippet: "Hello",
+      sent_at: "2026-11-17T09:00:00Z",
+      is_read: true,
+      is_starred: false,
+      is_draft: false,
+      body_html: '<p>Hi <img src="https://images.example/a.png"></p>',
+      body_text: "Hi",
+      has_remote_images: true,
+      attachments: [],
+    },
+  ],
 };
 
 const fetchMock = vi.fn<typeof fetch>();
@@ -43,6 +67,7 @@ function json(body: unknown, status = 200) {
 }
 
 beforeEach(() => {
+  userSettings.data = { load_remote_images: true };
   push.mockReset();
   fetchMock.mockReset();
   fetchMock.mockImplementation(async (input) => {
@@ -116,5 +141,27 @@ describe("ThreadReader actions follow the mailbox capabilities", () => {
     const user = await renderReader();
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
     expect(await menuItems(user)).toEqual(["Mark as unread"]);
+  });
+});
+
+describe("ThreadReader remote images", () => {
+  it("shows remote images by default", async () => {
+    accounts = [makeAccount("acc-1")];
+    await renderReader();
+    expect(await screen.findByTestId("message")).toHaveAttribute("data-images", "true");
+  });
+
+  it("keeps them hidden for a user who turned them off", async () => {
+    accounts = [makeAccount("acc-1")];
+    userSettings.data = { load_remote_images: false };
+    await renderReader();
+    expect(await screen.findByTestId("message")).toHaveAttribute("data-images", "false");
+  });
+
+  it("keeps them hidden while settings have not loaded or failed to load", async () => {
+    accounts = [makeAccount("acc-1")];
+    userSettings.data = undefined;
+    await renderReader();
+    expect(await screen.findByTestId("message")).toHaveAttribute("data-images", "false");
   });
 });

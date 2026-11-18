@@ -517,7 +517,7 @@
       "language": "Language",
       "languageDescription": "Used for the interface and for emails MailFlow sends you.",
       "remoteImages": "Always show remote images",
-      "remoteImagesDescription": "Off by default: remote images can tell senders when you open their email."
+      "remoteImagesDescription": "On by default. Turn off to block them: remote images can tell senders when you open their email."
     },
     "interface": {
       "title": "Interface",

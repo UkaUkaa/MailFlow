@@ -113,8 +113,11 @@ test.describe("preferences", () => {
     await page.goto("/en/settings/appearance");
     await page.getByRole("group", { name: "Theme" }).getByRole("button", { name: "Dark" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-    await page.getByRole("switch", { name: "Always show remote images" }).click();
-    await expect.poll(() => api.callsTo("PATCH", "/settings").map((call) => call.body)).toEqual(['{"theme":"dark"}', '{"load_remote_images":true}']);
+    const remoteImages = page.getByRole("switch", { name: "Always show remote images" });
+    await expect(remoteImages).toBeChecked();
+    await remoteImages.click();
+    await expect(remoteImages).not.toBeChecked();
+    await expect.poll(() => api.callsTo("PATCH", "/settings").map((call) => call.body)).toEqual(['{"theme":"dark"}', '{"load_remote_images":false}']);
   });
 
   test("updates the profile name", async ({ page }) => {

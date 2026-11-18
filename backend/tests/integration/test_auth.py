@@ -245,7 +245,7 @@ async def test_profile_and_settings(alice):
     assert defaults == {
         "locale": "en",
         "theme": "system",
-        "load_remote_images": False,
+        "load_remote_images": True,  # on by default (D41)
         "conversation_view": True,
         "list_density": "comfortable",
         "list_preview_lines": 1,
