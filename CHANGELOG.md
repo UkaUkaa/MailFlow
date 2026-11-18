@@ -7,6 +7,12 @@
   choice; anyone can turn images off in Settings → Appearance (D41). Until settings load, the
   reader keeps remote images blocked.
 
+### Fixed
+- **Home-screen app on iPhone.** MailFlow had no web app manifest, so iOS guessed the app's scope
+  from the page that was added and showed the browser's address bar and back/forward controls on
+  navigation outside it. Added `app/manifest.ts` (`scope` and `start_url` `/`, `standalone`),
+  PNG app icons, the Apple web-app meta tags, and `public/` in the frontend Docker image.
+
 ### Added
 - **Templates.** Settings → Templates lists, creates, edits and deletes reusable messages
   (name, subject, formatted body). In the composer a Templates menu inserts one — into an empty
