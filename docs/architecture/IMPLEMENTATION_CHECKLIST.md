@@ -17,6 +17,8 @@ Update this file whenever an item changes state.
 
 ## Phase 3 — Authentication and multi-tenancy
 - [x] Registration, verification, login, logout, password reset/change
+- [x] Sign in with Google (OIDC, `openid email profile`); real Google exchange not yet exercised end-to-end
+- [x] Public Privacy Policy and Terms of Service pages (en, uk)
 - [x] Sessions (list, revoke, expiry, idle timeout), CSRF, rate limiting, security headers, trusted hosts
 - [x] Tenant context + RLS + composite foreign keys
 - [x] Token Vault (AES-256-GCM keyring, AAD binding, rotation)

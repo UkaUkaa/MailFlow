@@ -11,6 +11,7 @@ import { Field } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
 import { useLogin, useResendVerification } from "../api";
 import { loginSchema, type LoginValues } from "../schemas";
+import { GoogleSignIn } from "./google-sign-in";
 import { AuthHeading, FormAlert } from "./auth-shell";
 
 export function LoginForm() {
@@ -38,6 +39,7 @@ export function LoginForm() {
   return (
     <>
       <AuthHeading title={t("login.title")} description={t("login.description")} />
+      <GoogleSignIn />
       <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
         {searchParams.get("reset") === "1" && !login.error ? <FormAlert tone="success">{t("login.passwordResetDone")}</FormAlert> : null}
         {login.error ? (

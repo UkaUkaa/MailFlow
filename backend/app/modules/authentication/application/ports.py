@@ -3,10 +3,16 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Protocol
 
-from app.modules.authentication.domain.entities import OneTimeTokenKind, Session
+from app.modules.authentication.domain.entities import (
+    ExternalIdentity,
+    OneTimeTokenKind,
+    Session,
+    SignInProviderKind,
+)
 
 
 class PasswordHasher(Protocol):
@@ -52,3 +58,36 @@ class OneTimeTokenRepository(Protocol):
 class AuthNotifier(Protocol):
     async def send_verification(self, *, to: str, token: str, locale: str) -> None: ...
     async def send_password_reset(self, *, to: str, token: str, locale: str) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class PendingSignIn:
+    """Server-side half of an external sign-in, stored under the hash of its state."""
+
+    code_verifier: str
+    nonce: str
+    locale: str
+    next_path: str
+
+
+class SignInStateStore(Protocol):
+    async def put(self, state_hash: str, pending: PendingSignIn, ttl_seconds: int) -> None: ...
+    async def take(self, state_hash: str) -> PendingSignIn | None:
+        """Atomically remove and return the pending sign-in. One state completes one flow."""
+
+
+class SignInProvider(Protocol):
+    kind: SignInProviderKind
+
+    @property
+    def configured(self) -> bool: ...
+    def authorization_url(self, *, state: str, code_challenge: str, nonce: str) -> str: ...
+    async def exchange(self, *, code: str, code_verifier: str, nonce: str) -> ExternalIdentity:
+        """Redeem the code and return the validated identity; raise ExternalSignInError."""
+
+
+class IdentityRepository(Protocol):
+    async def get_user_id(self, provider: SignInProviderKind, subject: str) -> uuid.UUID | None: ...
+    async def add(
+        self, *, user_id: uuid.UUID, provider: SignInProviderKind, subject: str, email: str
+    ) -> None: ...

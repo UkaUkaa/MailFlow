@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Added
+- Sign in with Google: "Continue with Google" on the sign-in and registration screens (shown
+  only when `GOOGLE_CLIENT_ID`/`SECRET` are set; `GET /auth/providers`). OpenID Connect with
+  state, PKCE and nonce; the state is single-use (Redis) and bound to the browser by an HttpOnly
+  cookie against login CSRF. Scopes `openid email profile` only — no mailbox access. The first
+  sign-in creates a verified account, later ones find it by the Google account ID
+  (`user_identities`, migration `0004`); an existing account with the same verified address is
+  linked. Callback: `{APP_BASE_URL}/api/v1/auth/oauth/google/callback`.
+- Public Privacy Policy (`/{locale}/privacy`) and Terms of Service (`/{locale}/terms`) in English
+  and Ukrainian, with the Google API Services User Data Policy / Limited Use disclosure required
+  for OAuth verification; linked from every signed-out screen.
 - Progress for thread actions: while an action (single or bulk) waits for the server, a centred
   card with a spinner names it and its count ("Moving 3 conversations to trash…") and blocks
   the rest of the app (modal: pointer, keyboard and Escape) until the server answers. It fades

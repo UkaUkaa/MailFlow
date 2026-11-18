@@ -361,7 +361,7 @@ async def test_every_tenant_table_has_rls_enabled(owner_engine):
     assert enabled == set(TENANT_TABLES)
     # Any table that carries user_id must either be tenant-protected or a known auth table.
     auth_tables = {"user_sessions", "email_verification_tokens", "password_reset_tokens",
-                   "audit_events"}  # fmt: skip
+                   "audit_events", "user_identities"}  # fmt: skip
     assert set(columns) - enabled == auth_tables
 
 

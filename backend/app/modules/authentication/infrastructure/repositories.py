@@ -6,10 +6,15 @@ from datetime import datetime
 from sqlalchemy import CursorResult, delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.authentication.domain.entities import OneTimeTokenKind, Session
+from app.modules.authentication.domain.entities import (
+    OneTimeTokenKind,
+    Session,
+    SignInProviderKind,
+)
 from app.modules.authentication.infrastructure.models import (
     EmailVerificationTokenModel,
     PasswordResetTokenModel,
+    UserIdentityModel,
     UserSessionModel,
 )
 
@@ -156,3 +161,25 @@ class SqlOneTimeTokenRepository:
             result = await self._db.execute(delete(model).where(model.expires_at < before))
             total += _rowcount(result)
         return total
+
+
+class SqlIdentityRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_user_id(self, provider: SignInProviderKind, subject: str) -> uuid.UUID | None:
+        return await self._session.scalar(
+            select(UserIdentityModel.user_id).where(
+                UserIdentityModel.provider == provider.value,
+                UserIdentityModel.subject == subject,
+            )
+        )
+
+    async def add(
+        self, *, user_id: uuid.UUID, provider: SignInProviderKind, subject: str, email: str
+    ) -> None:
+        row = UserIdentityModel(
+            user_id=user_id, provider=provider.value, subject=subject, email=email
+        )
+        self._session.add(row)
+        await self._session.flush()

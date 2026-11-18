@@ -50,10 +50,18 @@ unless `API_DOCS_ENABLED=true`).
 | GET | `/auth/sessions` | — | `{items:[Session]}` |
 | DELETE | `/auth/sessions/{id}` | — | `204` |
 | POST | `/auth/sessions/revoke-others` | — | `204` |
+| GET | `/auth/providers` | — | `{google: bool}` — external sign-in methods configured here |
+| GET | `/auth/oauth/google/start?locale=&next=` | — | `302` to Google (scopes `openid email profile`) + HttpOnly `mf_signin_state` cookie |
+| GET | `/auth/oauth/google/callback` | `code`, `state` from Google | `302` to `/{locale}{next}` + session cookie, or to `/{locale}/login?oauth_error=<code>` |
 
 `User`: `{id, email, display_name, email_verified, created_at}`.
 `Session`: `{id, created_at, last_seen_at, expires_at, user_agent, ip_address, is_current}`.
 Password policy: 10–128 characters.
+
+Sign in with Google is MailFlow authentication only and grants no mailbox access (Gmail is
+connected separately under `/accounts`). `next` must be a same-origin path, otherwise
+`/mail/inbox`. `oauth_error`: `access_denied`, `email_not_verified`, `account_disabled`,
+`invalid_state`, `not_configured`, `provider_error`.
 
 ## Users — `/users`
 
