@@ -49,4 +49,7 @@ TENANT_TABLES: tuple[str, ...] = (
     "attachments",
     "outbox_items",
     "outbox_attachments",
+    "message_templates",
+    "user_secrets",
+    "assistant_configs",
 )

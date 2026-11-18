@@ -188,3 +188,17 @@ Honest list of what is missing or partial. Update whenever something here change
   `mf_tz` cookie), not from IP geolocation or a saved per-user setting, so a message scheduled
   for 08:00 goes out at 08:00 of the zone the user was in when scheduling. No recurring sends.
   Snooze is not implemented.
+
+## Templates and AI replies (D43)
+
+- Templates hold subject and body only: no attachments, recipients or per-account signatures.
+  Placeholders work in text, not inside link addresses; a placeholder without a value (e.g. no
+  recipient name) is left as written.
+- AI replies are tested against a fake gateway, mocked HTTP for OpenAI and Gemini and a stubbed
+  Anthropic client; **not yet run against the live OpenAI, Anthropic or Gemini APIs.**
+- One AI key per user (one provider at a time); replacing it replaces the provider. The model
+  list is taken when the key is connected; reconnect the key to see newly released models.
+- Drafts arrive whole (no streaming); a long thread can take several seconds.
+- Style samples come only from sent mail already synchronized into MailFlow; quoted-text removal
+  is a heuristic for common English, Ukrainian and Russian reply headers.
+- AI drafting is offered for replies (not new messages or forwards). Attachments are not read.

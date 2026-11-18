@@ -12,6 +12,12 @@ class CredentialKind(StrEnum):
     SMTP_PASSWORD = "smtp_password"
 
 
+class UserSecretKind(StrEnum):
+    """Secrets that belong to the user rather than to one connected mailbox."""
+
+    AI_API_KEY = "ai_api_key"
+
+
 @dataclass(frozen=True, slots=True)
 class SealedSecret:
     """Authenticated ciphertext plus the identifier of the key that produced it."""

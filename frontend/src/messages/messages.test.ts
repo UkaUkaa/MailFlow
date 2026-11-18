@@ -38,7 +38,15 @@ describe("translations", () => {
   });
 
   it("actually translates the Ukrainian interface", () => {
-    const allowedIdentical = new Set(["accounts.providers.gmail", "accounts.providers.outlook", "accounts.providers.imap"]);
+    // Product names are the same in every language.
+    const allowedIdentical = new Set([
+      "accounts.providers.gmail",
+      "accounts.providers.outlook",
+      "accounts.providers.imap",
+      "assistant.settings.providers.openai",
+      "assistant.settings.providers.anthropic",
+      "assistant.settings.providers.gemini",
+    ]);
     const identical = [...english].filter(([key, value]) => ukrainian.get(key) === value && !allowedIdentical.has(key));
     expect(identical.map(([key]) => key)).toEqual([]);
   });

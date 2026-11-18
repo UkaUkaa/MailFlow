@@ -8,6 +8,19 @@
   reader keeps remote images blocked.
 
 ### Added
+- **Templates.** Settings → Templates lists, creates, edits and deletes reusable messages
+  (name, subject, formatted body). In the composer a Templates menu inserts one — into an empty
+  body whole, otherwise at the caret — filling `{{first_name}}`, `{{name}}`, `{{email}}`,
+  `{{my_name}}` and `{{date}}`, and "Save as template" stores what is being written. Backend
+  module `templates`, `/templates` API, table `message_templates` (migration 0007, tenant RLS).
+- **AI replies with your own key** (D43). In Settings → AI replies each user connects their own
+  ChatGPT (OpenAI), Claude (Anthropic) or Gemini (Google) API key — checked with the provider,
+  stored encrypted in the Token Vault, shown only as its last four characters — and picks a model
+  from those the key can use. "Write with AI" in the reply composer turns a short note into the
+  full reply, in the user's own style (from their sent mail to the same person) and in the
+  language of the conversation. Backend module `assistant` (OpenAI and Gemini over HTTPX, Claude
+  via the Anthropic SDK), `/assistant` API, tables `user_secrets` and `assistant_configs`
+  (migration 0007, tenant RLS); Privacy Policy updated.
 - **Send later and undo send** (D42). A "Send later" menu next to Send (later today, tomorrow
   morning, Monday morning, or any date and time), a Scheduled view to reschedule or cancel what
   is waiting, and an Undo toast after every send for a configurable window (Settings: off, 5,

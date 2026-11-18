@@ -415,6 +415,30 @@ class SqlMailRepository:
         )
         return [_message(r) for r in rows]
 
+    async def list_sent_messages(
+        self,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+        *,
+        recipient_email: str | None,
+        limit: int,
+    ) -> builtins.list[Message]:
+        stmt = select(M).where(
+            M.user_id == user_id,
+            M.account_id == account_id,
+            M.in_sent.is_(True),
+            M.is_draft.is_(False),
+        )
+        if recipient_email:
+            stmt = stmt.where(M.to_addresses.contains([{"email": recipient_email}]))
+        rows = await self._db.scalars(
+            stmt.options(undefer(M.body_html), undefer(M.body_text))
+            .order_by(M.sent_at.desc(), M.id.desc())
+            .limit(limit)
+            .execution_options(populate_existing=True)
+        )
+        return [_message(r) for r in rows]
+
     async def get_message(self, user_id: uuid.UUID, message_id: uuid.UUID) -> Message | None:
         row = await self._db.scalar(
             select(M)

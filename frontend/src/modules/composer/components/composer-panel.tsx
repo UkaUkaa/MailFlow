@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Maximize2, Minimize2, Paperclip, Send, Trash2, X } from "lucide-react";
+import { ChevronDown, FileText, Maximize2, Minimize2, Paperclip, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { toast } from "sonner";
@@ -13,7 +13,9 @@ import {
   MAX_ATTACHMENT_TOTAL_BYTES,
   type Attachment,
 } from "@/modules/attachments";
+import { AiReplyBar } from "@/modules/assistant";
 import { SendLaterMenu } from "@/modules/outbox";
+import { TemplatePicker, type FilledTemplate } from "@/modules/templates";
 import { ResponsiveDialog } from "@/shared/components/layout/responsive-dialog";
 import { Button } from "@/shared/components/ui/button";
 import { NativeSelect } from "@/shared/components/ui/input";
@@ -29,7 +31,7 @@ import { toServerLocalTime } from "@/shared/lib/user-time";
 import { sendErrorKey } from "../lib/send-errors";
 import type { ComposeSession, DraftRequest, SendResult } from "../types";
 import { RecipientsInput } from "./recipients-input";
-import { EditorToolbar, RichTextArea, useRichTextEditor } from "./rich-text-editor";
+import { EditorToolbar, RichTextArea, useRichTextEditor } from "@/shared/components/editor/rich-text-editor";
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 const AUTOSAVE_DELAY_MS = 1500;
@@ -93,6 +95,12 @@ export function ComposerPanel({
   const [confirmNoSubject, setConfirmNoSubject] = useState(false);
   // The send-later picker is rendered through portals, but its keys still bubble to this panel.
   const [scheduleOpen, setScheduleOpen] = useState(false);
+  // Template menu or its "save as template" dialog: their keys also bubble to this panel.
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
+  // AI replies need the message being answered, so they are offered for replies only. Without
+  // the user's own AI key the bar explains how to connect one.
+  const canDraftWithAi = Boolean(session.sourceMessageId) && (session.mode === "reply" || session.mode === "reply_all");
   /** The time chosen in "Send later" while the "no subject" question is open. */
   const pendingSendAt = useRef<Date | null>(null);
 
@@ -181,6 +189,22 @@ export function ComposerPanel({
   useEffect(() => {
     if (editor && session.mode !== "new" && session.mode !== "forward") editor.commands.focus("start");
   }, [editor, session.mode]);
+
+  /** Puts a template in: into an empty body whole, otherwise at the caret; the subject only if empty. */
+  const insertTemplate = (template: FilledTemplate) => {
+    if (template.subject && !subject.trim()) setSubject(template.subject);
+    if (editor && template.bodyHtml) {
+      if (editor.isEmpty) editor.chain().setContent(template.bodyHtml, { emitUpdate: true }).focus("end").run();
+      else editor.chain().focus().insertContent(template.bodyHtml).run();
+    }
+    touch();
+  };
+
+  /** The AI draft replaces the body as one editor step, so undo restores what was there. */
+  const insertDraft = (bodyHtml: string) => {
+    editor?.chain().setContent(bodyHtml, { emitUpdate: true }).focus("end").run();
+    touch();
+  };
 
   // Warn before a reload/close that would lose changes not yet stored as a draft.
   useEffect(() => {
@@ -299,7 +323,7 @@ export function ComposerPanel({
   };
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !scheduleOpen) {
+    if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !scheduleOpen && !templatesOpen) {
       event.preventDefault();
       void send();
     }
@@ -307,7 +331,8 @@ export function ComposerPanel({
   // Capture phase: the rich-text editor consumes Escape, so a bubbling handler never sees it
   // while the caret is in the message body.
   const onKeyDownCapture = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape" && !event.defaultPrevented && !confirmDiscard && !confirmNoSubject && !scheduleOpen) {
+    const ownKeys = event.target instanceof Element && event.target.closest("[data-composer-own-keys]");
+    if (event.key === "Escape" && !event.defaultPrevented && !ownKeys && !confirmDiscard && !confirmNoSubject && !scheduleOpen && !templatesOpen) {
       event.preventDefault();
       event.stopPropagation();
       void close();
@@ -378,6 +403,37 @@ export function ComposerPanel({
       </Button>
     </Tooltip>
   );
+
+  const templateButton = (className?: string) => (
+    <TemplatePicker
+      recipient={to[0] ?? null}
+      canSave={subject.trim() !== "" || !bodyEmpty}
+      getCurrent={() => ({ subject, bodyHtml: htmlRef.current })}
+      onInsert={insertTemplate}
+      onOpenChange={setTemplatesOpen}
+      trigger={
+        <Button variant="ghost" size="icon" aria-label={t("templates")} title={t("templates")} className={className}>
+          <FileText />
+        </Button>
+      }
+    />
+  );
+
+  const aiButton = (className?: string) =>
+    canDraftWithAi ? (
+      <Tooltip label={t("writeWithAi")}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={t("writeWithAi")}
+          aria-pressed={aiOpen}
+          onClick={() => setAiOpen((open) => !open)}
+          className={cn(aiOpen && "bg-accent-soft text-accent", className)}
+        >
+          <Sparkles />
+        </Button>
+      </Tooltip>
+    ) : null;
 
   const discardButton = (className?: string) => (
     <Tooltip label={t("discard")}>
@@ -477,6 +533,8 @@ export function ComposerPanel({
                 {saveLabel}
               </span>
             </div>
+            {aiButton("max-md:hidden")}
+            {templateButton("max-md:hidden")}
             {attachButton("max-md:hidden")}
             {discardButton("max-md:hidden")}
             {chooseFrom ? (
@@ -554,6 +612,12 @@ export function ComposerPanel({
                 </>
               ) : null}
             </div>
+
+            {aiOpen && canDraftWithAi && session.sourceMessageId ? (
+              <div className="pt-3">
+                <AiReplyBar sourceMessageId={session.sourceMessageId} onDraft={insertDraft} onClose={() => setAiOpen(false)} />
+              </div>
+            ) : null}
 
             <div className="py-3" onClick={() => editor?.isFocused || editor?.commands.focus()}>
               <RichTextArea editor={editor} />
@@ -649,6 +713,8 @@ export function ComposerPanel({
         >
           <EditorToolbar editor={editor} className="flex-1" />
           <input id={fileInputId} type="file" multiple hidden onChange={addFiles} />
+          {aiButton(docked ? undefined : "md:hidden")}
+          {templateButton(docked ? undefined : "md:hidden")}
           {attachButton(docked ? undefined : "md:hidden")}
           {discardButton(docked ? undefined : "md:hidden")}
           {docked ? sendButton : null}

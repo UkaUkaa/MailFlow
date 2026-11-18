@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from app.core.database.base import TENANT_TABLES
-from tests.conftest import PASSWORD, connect_mailbox
+from tests.conftest import PASSWORD, connect_ai, connect_mailbox
 from tests.fakes import make_message
 
 USER_TABLES = (*TENANT_TABLES, "user_sessions", "email_verification_tokens",
@@ -15,6 +15,8 @@ async def _populate(actor, registry, runner, email):
     registry.mailbox(email).add(make_message("m1"), record=False)
     await runner.run(actor.user_id, account_id)
     await actor.client.patch("/api/v1/settings", json={"theme": "dark"})
+    assert (await actor.client.post("/api/v1/templates", json={"name": "t"})).status_code == 201
+    await connect_ai(actor)
     return account_id
 
 

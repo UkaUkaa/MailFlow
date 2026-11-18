@@ -35,6 +35,9 @@ from app.integrations.email_providers.registry import (
     DefaultProviderRegistry,
     build_provider_http_client,
 )
+from app.modules.assistant.application import AiGateway, AssistantService
+from app.modules.assistant.infrastructure.gateway import HttpAiGateway, build_ai_http_client
+from app.modules.assistant.infrastructure.repository import SqlAssistantConfigRepository
 from app.modules.attachments.application import AttachmentService
 from app.modules.attachments.infrastructure import SafeAttachmentNormalizer, SqlAttachmentRepository
 from app.modules.audit.infrastructure import SqlAuditLog
@@ -60,8 +63,14 @@ from app.modules.settings.application import SettingsService
 from app.modules.settings.infrastructure import SqlSettingsRepository
 from app.modules.synchronization.application import SyncQueue, SyncRequestService
 from app.modules.synchronization.infrastructure import SqlSyncStateRepository
-from app.modules.token_vault.application import Cipher, TokenVault
-from app.modules.token_vault.infrastructure import AesGcmKeyring, SqlCredentialRepository
+from app.modules.templates.application import TemplateService
+from app.modules.templates.infrastructure import SqlTemplateRepository
+from app.modules.token_vault.application import Cipher, TokenVault, UserSecretVault
+from app.modules.token_vault.infrastructure import (
+    AesGcmKeyring,
+    SqlCredentialRepository,
+    SqlUserSecretRepository,
+)
 from app.modules.users.application import AccountLifecycleService, UserProfileService
 from app.modules.users.infrastructure import SqlUserRepository
 from app.shared.application.ports import Clock, SystemClock
@@ -106,6 +115,9 @@ class Runtime:
     sync_queue: SyncQueue
     clock: Clock
     outbox_queue: OutboxQueue = field(default_factory=_NullOutboxQueue)
+    # Each user's own AI provider and key (D43); replaced by a fake in tests.
+    ai_gateway: AiGateway | None = None
+    ai_http: httpx.AsyncClient | None = None
 
     @classmethod
     def create(
@@ -118,6 +130,7 @@ class Runtime:
     ) -> Runtime:
         engine = create_engine(settings, pooled=pooled)
         http = build_provider_http_client(settings)
+        ai_http = build_ai_http_client(settings.assistant_timeout_seconds)
         return cls(
             settings=settings,
             engine=engine,
@@ -129,10 +142,14 @@ class Runtime:
             sync_queue=sync_queue or _NullQueue(),
             clock=SystemClock(),
             outbox_queue=outbox_queue or _NullOutboxQueue(),
+            ai_gateway=HttpAiGateway(ai_http, settings.assistant_timeout_seconds),
+            ai_http=ai_http,
         )
 
     async def close(self) -> None:
         await self.http.aclose()
+        if self.ai_http is not None:
+            await self.ai_http.aclose()
         await self.redis.aclose()
         await self.engine.dispose()
 
@@ -304,6 +321,25 @@ class Services:
             self._rt.outbox_queue,
             self.audit,
             self._rt.clock,
+        )
+
+    @cached_property
+    def templates(self) -> TemplateService:
+        return TemplateService(SqlTemplateRepository(self._db), Nh3HtmlSanitizer())
+
+    @cached_property
+    def assistant(self) -> AssistantService:
+        if self._rt.ai_gateway is None:
+            raise RuntimeError("Runtime has no AI gateway.")
+        return AssistantService(
+            self._rt.ai_gateway,
+            SqlAssistantConfigRepository(self._db),
+            UserSecretVault(self._rt.cipher, SqlUserSecretRepository(self._db)),
+            self.thread_queries,
+            self.accounts,
+            self.profile,
+            self.limiter,
+            self._rt.settings.assistant_requests_per_hour,
         )
 
     @property

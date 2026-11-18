@@ -245,3 +245,43 @@ once an item is sent or cancelled. Another user's item is a `404`.
 | Method | Path | Notes |
 |---|---|---|
 | GET | `/search?q=&account_id=&cursor=&limit=` | `ThreadSummary` list from the user's synchronized mail |
+
+## Templates — `/templates`
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| GET | `/templates` | — | `{items: Template[]}` sorted by name |
+| POST | `/templates` | `{name, subject?, body_html?}` | `201 Template` |
+| PATCH | `/templates/{id}` | partial `{name, subject, body_html}` | `Template` |
+| DELETE | `/templates/{id}` | — | `204` |
+
+`Template`: `{id, name, subject, body_html, created_at, updated_at}`. `name` is required (1–100
+characters after collapsing whitespace), `subject` ≤ 998, `body_html` ≤ 100 KB and sanitized on
+save. At most 200 templates per user (`409 template_limit_reached`). Someone else's template is a
+`404`. Placeholders `{{first_name}}`, `{{name}}`, `{{email}}`, `{{my_name}}`, `{{date}}` are stored
+as written; the composer fills them in on insert.
+
+## Assistant — `/assistant`
+
+| Method | Path | Body | Response |
+|---|---|---|---|
+| GET | `/assistant` | — | `Assistant` |
+| PUT | `/assistant` | `{provider: "openai"\|"anthropic"\|"gemini", api_key, model?}` | `Assistant` |
+| PATCH | `/assistant` | `{model}` | `Assistant` |
+| DELETE | `/assistant` | — | `204` |
+| POST | `/assistant/reply` | `{source_message_id, instruction?}` | `{language, body_html}` |
+
+`Assistant`: `{configured, provider, model, key_hint, models}` — the user's own AI connection
+(D43). The key is never returned; `key_hint` is its last four characters. `PUT` checks the key
+with the provider by listing its models (`422 assistant_key_invalid` if refused,
+`422 assistant_no_models` if none can write text) and stores it in the Token Vault; key checks
+are limited to 10 per user per hour. `model` must be one of `models` (`422` otherwise).
+
+`/assistant/reply` drafts a reply to `source_message_id` (the message being answered) from a
+short `instruction` (≤ 2000 characters, may be empty), in the user's style and the
+conversation's language, with the user's provider and model. `language` is a BCP 47 code (`und`
+when unknown); `body_html` holds escaped paragraphs and line breaks only. Nothing is sent.
+Errors: `409 assistant_not_configured`, `404` (not the caller's message), `429 rate_limited`
+(per user, `ASSISTANT_REQUESTS_PER_HOUR`), and from the provider `422 assistant_key_invalid`,
+`422 assistant_model_unavailable` / `assistant_model_unsupported`, `422 assistant_refused`,
+`429 assistant_rate_limited` (the user's own limit or credit), `503 assistant_unavailable`.

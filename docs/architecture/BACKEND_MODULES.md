@@ -4,12 +4,14 @@
 |---|---|---|
 | `authentication` | Registration, login, logout, sessions, email verification, password reset | `user_sessions`, `email_verification_tokens`, `password_reset_tokens` |
 | `users` | User record, profile, deactivation, deletion orchestration | `users` |
-| `token_vault` | Encrypt, store, read, rotate, delete provider credentials | `account_credentials` |
+| `token_vault` | Encrypt, store, read, rotate, delete provider credentials and user secrets | `account_credentials`, `user_secrets` |
 | `email_accounts` | Connect / reconnect / disconnect mailboxes, OAuth state, connection status | `email_accounts`, `oauth_states` |
 | `emails` | Messages and threads: listing, reading, actions, composing, drafts | `email_messages`, `email_threads` |
 | `folders` | System and provider folders/labels, unread counts | `email_folders`, `message_folders` |
 | `attachments` | Attachment metadata, authorized streaming download | `attachments` |
 | `outbox` | Scheduled sends: send later and undo send (D42); worker-side dispatch | `outbox_items`, `outbox_attachments` |
+| `templates` | Reusable message templates (name, subject, body with placeholders) | `message_templates` |
+| `assistant` | AI reply drafting with the user's own OpenAI / Anthropic / Gemini key (D43) | `assistant_configs` (key in `user_secrets`) |
 | `search` | Full-text search over the user's stored message metadata | — (reads `emails` through its public interface) |
 | `synchronization` | Sync state, locks, initial/incremental/manual sync, scheduling | `sync_states` |
 | `settings` | Per-user preferences (language, theme, remote images) | `user_settings` |
@@ -52,6 +54,8 @@ emails ─> email_accounts, folders, token_vault, attachments
 attachments ─> email_accounts, token_vault
 search ─> emails
 outbox ─> emails, settings
+templates ─> emails(HtmlSanitizer port)
+assistant ─> emails, email_accounts, users, token_vault
 synchronization ─> email_accounts, emails, folders, attachments, token_vault
 users (deletion) ─> authentication(port), email_accounts(port)
 ```

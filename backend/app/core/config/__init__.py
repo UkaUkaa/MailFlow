@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     smtp_tls: bool = False
     mail_from: str = "MailFlow <no-reply@mailflow.local>"
 
+    # AI reply drafting with each user's own key (OpenAI, Anthropic, Gemini; D43).
+    assistant_timeout_seconds: float = 90.0
+    assistant_requests_per_hour: int = 30
+
     max_request_body_bytes: int = 30 * 1024 * 1024
     max_message_attachment_bytes: int = 25 * 1024 * 1024
     max_message_attachments: int = 20

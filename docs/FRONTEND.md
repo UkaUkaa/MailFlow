@@ -247,3 +247,19 @@ instead of being offered and rejected with `422 unsupported`:
   same address again replaces them.
 - The search box is shown for every mailbox; `server_search`, `threads` and `labels` do not change
   the interface.
+
+## Templates and AI replies
+
+- `src/modules/templates`: types, `/templates` hooks under `["templates"]`, `lib/fill.ts`
+  (placeholder values for the first recipient; values escaped into HTML), `TemplatesSettings`
+  (Settings → Templates), `TemplateEditorDialog` (sheet on phones) and `TemplatePicker` (the
+  composer's Templates menu, with "Save as template").
+- `src/modules/assistant`: `/assistant` hooks under `["assistant"]`, `lib/errors.ts` (error codes
+  → messages, language names via `Intl.DisplayNames`), `AssistantSettings` (Settings → AI
+  replies: provider, API key with a "get a key" link, model, replace / remove) and `AiReplyBar`
+  (the note box inside the reply composer). The button shows for replies; without a connected key
+  the bar explains it and links to the settings page instead of calling the API.
+- The rich-text editor moved to `src/shared/components/editor` so the composer and the template
+  editor share it.
+- The composer's Escape handler ignores keys from elements marked `data-composer-own-keys` (the
+  AI note box closes itself on Escape).

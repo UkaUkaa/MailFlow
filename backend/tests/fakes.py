@@ -28,6 +28,8 @@ from app.integrations.email_providers.contracts import (
     ThreadAction,
 )
 from app.integrations.email_providers.gmail.provider import GMAIL_CAPABILITIES
+from app.modules.assistant.domain import AiProvider, ReplyDraft, ReplyRequest
+from app.modules.assistant.infrastructure.errors import key_rejected
 
 BASE_TIME = datetime(2026, 1, 1, tzinfo=UTC)
 
@@ -361,3 +363,41 @@ class CapturingNotifier:
 
     async def send_password_reset(self, *, to: str, token: str, locale: str) -> None:
         self.resets[to] = token
+
+
+@dataclass
+class FakeAiGateway:
+    """Stands in for OpenAI / Anthropic / Gemini: no network. Records every call."""
+
+    models: dict[AiProvider, list[str]] = field(
+        default_factory=lambda: {
+            AiProvider.OPENAI: ["gpt-5-mini", "gpt-5", "gpt-4o"],
+            AiProvider.ANTHROPIC: ["claude-sonnet-5-5", "claude-opus-5-5"],
+            AiProvider.GEMINI: ["gemini-2.5-pro", "gemini-2.5-flash"],
+        }
+    )
+    rejected_keys: set[str] = field(default_factory=set)
+    language: str = "uk"
+    body: str = "Добрий день!\n\nДякую, підходить.\nДо зустрічі"
+    listed: list[tuple[AiProvider, str]] = field(default_factory=list)
+    writers: list[tuple[AiProvider, str, str]] = field(default_factory=list)
+    requests: list[ReplyRequest] = field(default_factory=list)
+
+    async def list_models(self, provider: AiProvider, api_key: str) -> list[str]:
+        self.listed.append((provider, api_key))
+        if api_key in self.rejected_keys:
+            raise key_rejected()
+        return list(self.models[provider])
+
+    def writer(self, provider: AiProvider, api_key: str, model: str) -> _FakeWriter:
+        self.writers.append((provider, api_key, model))
+        return _FakeWriter(self)
+
+
+@dataclass
+class _FakeWriter:
+    gateway: FakeAiGateway
+
+    async def write(self, request: ReplyRequest) -> ReplyDraft:
+        self.gateway.requests.append(request)
+        return ReplyDraft(language=self.gateway.language, body=self.gateway.body)

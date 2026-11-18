@@ -85,6 +85,16 @@ class MailRepository(Protocol):
         self, user_id: uuid.UUID, thread_id: uuid.UUID
     ) -> builtins.list[Message]: ...
     async def get_message(self, user_id: uuid.UUID, message_id: uuid.UUID) -> Message | None: ...
+    async def list_sent_messages(
+        self,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+        *,
+        recipient_email: str | None,
+        limit: int,
+    ) -> builtins.list[Message]:
+        """The user's own sent messages from one mailbox, newest first, bodies loaded."""
+
     async def set_flags(
         self, user_id: uuid.UUID, message_id: uuid.UUID, flags: MessageFlags
     ) -> None: ...

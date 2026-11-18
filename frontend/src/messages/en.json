@@ -398,7 +398,9 @@
       "sending": "Sending…",
       "tooLate": "Too late — the message was already sent",
       "failed": "The send could not be undone. Check Scheduled or Sent."
-    }
+    },
+    "templates": "Templates",
+    "writeWithAi": "Write with AI"
   },
   "auth": {
     "backToLogin": "Back to sign in",
@@ -509,7 +511,9 @@
       "interface": "Interface",
       "security": "Password",
       "sessions": "Sessions",
-      "danger": "Delete account"
+      "danger": "Delete account",
+      "templates": "Templates",
+      "assistant": "AI replies"
     },
     "profile": {
       "title": "Profile",
@@ -675,7 +679,15 @@
         "sharing": {
           "title": "Sharing",
           "body": {
-            "p1": "We share information only with the email providers you connect (to perform the actions you request) and with infrastructure providers that host the service on our behalf under confidentiality obligations. We disclose information to authorities only when the law requires it."
+            "p1": "We share information only with the email providers you connect (to perform the actions you request), with infrastructure providers that host the service on our behalf under confidentiality obligations, and, only if you connect your own AI service, with that service as described below. We disclose information to authorities only when the law requires it."
+          }
+        },
+        "ai": {
+          "title": "AI replies (optional)",
+          "body": {
+            "p1": "AI replies work only with your own API key for an AI service you choose (OpenAI, Anthropic or Google Gemini). The key is stored encrypted (AES-256-GCM), is never shown again or logged, and you can remove it at any time.",
+            "p2": "When you ask for a draft, MailFlow sends that AI service the conversation you are replying to, a few of your previously sent messages from the same mailbox (so the draft matches your style), your name and email address, and the note you wrote. Nothing is sent before you ask, and nothing automatically. The service's own terms and privacy policy apply to that request, and its usage is billed to your account with them.",
+            "p3": "The draft only appears in your composer; you review it and decide whether to send it. MailFlow does not use your mail to train AI models."
           }
         },
         "security": {
@@ -812,6 +824,100 @@
         "in_past": "Choose a time in the future.",
         "too_far": "Choose a time within one year from now."
       }
+    }
+  },
+  "templates": {
+    "title": "Templates",
+    "description": "Messages you write often. Insert one from the composer and it fills in the recipient's name and today's date.",
+    "new": "New template",
+    "newTitle": "New template",
+    "editTitle": "Edit template",
+    "empty": "No templates yet. Create one here, or save a message you are writing with “Save as template”.",
+    "emptyBody": "Empty message",
+    "editNamed": "Edit {name}",
+    "deleteNamed": "Delete {name}",
+    "delete": "Delete",
+    "deleteTitle": "Delete this template?",
+    "deleteDescription": "“{name}” will be deleted. Messages already written with it are not affected.",
+    "deleted": "Template deleted",
+    "saved": "Template saved",
+    "name": "Name",
+    "namePlaceholder": "For example: Meeting follow-up",
+    "subject": "Subject",
+    "body": "Message",
+    "bodyPlaceholder": "Write the message. Placeholders below are filled in when you insert it.",
+    "placeholdersHint": "Insert:",
+    "insertPlaceholder": "Insert placeholder: {label}",
+    "placeholders": {
+      "first_name": "First name",
+      "name": "Full name",
+      "email": "Email",
+      "my_name": "My name",
+      "date": "Date"
+    },
+    "errors": {
+      "nameRequired": "Give the template a name.",
+      "limit": "You have reached the limit of 200 templates."
+    },
+    "picker": {
+      "title": "Templates",
+      "loading": "Loading templates…",
+      "empty": "No templates yet — create them in Settings → Templates",
+      "saveCurrent": "Save as template"
+    }
+  },
+  "assistant": {
+    "settings": {
+      "title": "AI replies",
+      "description": "Connect your own AI account — ChatGPT, Claude or Gemini — and write a short note to get the full reply, in your style and in the language of the conversation.",
+      "providers": {
+        "openai": "ChatGPT (OpenAI)",
+        "anthropic": "Claude (Anthropic)",
+        "gemini": "Gemini (Google)"
+      },
+      "provider": "AI service",
+      "key": "API key",
+      "keyHint": "Stored encrypted. MailFlow never shows it again, only its last four characters.",
+      "keyRequired": "Paste your API key.",
+      "getKey": "Get a {provider} key",
+      "consent": "By connecting, you allow MailFlow to send the conversation you reply to, a few of your sent messages and your note to {provider} when you ask for a draft. Usage is billed to your own account with them.",
+      "connect": "Check and connect",
+      "checking": "Checking the key…",
+      "connected": "{provider} connected",
+      "keyEnding": "Key ending in {hint}",
+      "replace": "Replace key",
+      "remove": "Remove",
+      "model": "Model",
+      "modelDescription": "Models your key can use. Larger models write better replies but are slower and cost more.",
+      "removeTitle": "Remove your AI key?",
+      "removeDescription": "The key is deleted from MailFlow. Write with AI stops working until you connect a key again.",
+      "removed": "AI key removed",
+      "privacyTitle": "What is shared, and when",
+      "privacyKey": "Your key is encrypted on the server (AES-256-GCM) and used only for your own drafts. You can remove it at any time; also revoke it in your provider's console if you no longer use it.",
+      "privacySent": "Only when you press Write: the conversation you are replying to, a few of your sent messages from the same mailbox (to match your style), your name and address, and your note are sent to the AI service you connected. Its own terms and data policy apply.",
+      "privacyReview": "The draft only appears in the composer. You review it and send it yourself."
+    },
+    "composer": {
+      "title": "Write with AI",
+      "placeholder": "What should the reply say? For example: agree, but move it to Thursday",
+      "hint": "Enter to write, Shift+Enter for a new line",
+      "write": "Write",
+      "rewrite": "Rewrite",
+      "writing": "Writing the reply…",
+      "writtenIn": "Written in {language}. Undo brings your text back.",
+      "setupExplanation": "Connect your own ChatGPT, Claude or Gemini API key to write replies with AI. Nothing is sent until you do.",
+      "setup": "Connect AI"
+    },
+    "errors": {
+      "notConfigured": "Connect your AI key in Settings → AI replies first.",
+      "keyInvalid": "The AI service did not accept this key. Check it and try again.",
+      "noModels": "This key cannot use any model that writes text.",
+      "model": "This model is not available for your key. Choose another one in Settings → AI replies.",
+      "providerLimit": "Your AI account hit its rate limit or ran out of credit. Check it with your provider.",
+      "rateLimited": "Too many requests in a short time. Try again in a few minutes.",
+      "refused": "The AI declined to write this reply. Try different wording.",
+      "unavailable": "The AI service is unavailable right now. Try again.",
+      "generic": "Something went wrong. Try again."
     }
   }
 }
