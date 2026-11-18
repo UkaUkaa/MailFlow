@@ -16,5 +16,3 @@ test-results/
 playwright-report/
 *.tsbuildinfo
 .DS_Store
-infra/nginx/certs/*
-!infra/nginx/certs/.gitkeep

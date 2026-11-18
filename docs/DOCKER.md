@@ -34,8 +34,12 @@ Open <http://localhost:8080>. Mail catcher: <http://127.0.0.1:8025>.
 
 ## Production
 
+The same `docker-compose.yml` runs in production; there is no separate override file. Put a
+reverse proxy on the host (Caddy, Traefik, a host Nginx or a load balancer) in front of the
+bundled Nginx: it terminates TLS on 443 and forwards to `HTTP_PORT` (default `8080`).
+
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose up -d --build
 ```
 
 Requirements:
@@ -43,9 +47,9 @@ Requirements:
 - `ENVIRONMENT=production`, `APP_BASE_URL=https://your.domain`, `ALLOWED_HOSTS=["your.domain"]`.
   The backend refuses to start in production without an https base URL, vault keys and a real
   encrypted SMTP server (`SMTP_HOST` not empty/`mailpit`/loopback; `SMTP_STARTTLS` or `SMTP_TLS`).
-- TLS certificate and key at `infra/nginx/certs/fullchain.pem` and `privkey.pem`
-  (for example from certbot); Nginx listens on 443 and redirects 80.
-- Real SMTP settings (`SMTP_HOST`, …); Mailpit is disabled by the override.
+- TLS terminated by the host reverse proxy, which must keep the original `Host` header.
+- Real SMTP settings (`SMTP_HOST`, …). Mailpit still starts as part of the stack but is unused
+  once `SMTP_HOST` points elsewhere; it publishes only on `127.0.0.1`.
 - Secrets supplied through `.env` with mode 600 or, better, your orchestrator's secret store.
 - Backups for `pgdata` (see `DATABASE.md`) and a separate backup of the vault key.
 
@@ -73,10 +77,8 @@ One-time setup:
    - variables `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_PATH`, `DEPLOY_URL`
      (`https://your.domain`, checked for HTTP 200 on `/en/login`) and optional `DEPLOY_PORT`.
 
-The script runs plain `docker compose`, so the server chooses the files with `COMPOSE_FILE` in
-its `.env`: unset means `docker-compose.yml` only (a host reverse proxy terminates TLS and forwards
-to the bundled Nginx), `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml` when the bundled
-Nginx owns ports 80/443.
+The script runs plain `docker compose` with `docker-compose.yml`; TLS is terminated by the
+host reverse proxy described above.
 
 Until `DEPLOY_HOST` is set the deploy job is skipped. `scripts/deploy.sh <sha>` can also be run
 by hand on the server.
