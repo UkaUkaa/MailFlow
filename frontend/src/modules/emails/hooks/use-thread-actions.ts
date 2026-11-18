@@ -62,7 +62,7 @@ export function useThreadActions() {
       if (threadIds.length === 0) return;
       // Promise handlers (unlike per-call mutate callbacks) still run after the
       // calling component unmounts, e.g. when the reader navigates back to the list.
-      mutateAsync({ threadIds, action }).then(
+      mutateAsync({ threadIds, action, silent: options.silent }).then(
         () => {
           if (options.silent || !ANNOUNCED.has(action)) return;
           const inverse = INVERSE_ACTION[action];

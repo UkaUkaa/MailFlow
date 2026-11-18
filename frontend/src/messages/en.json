@@ -217,6 +217,18 @@
         "spam": "{count, plural, one {Conversation marked as spam} other {# conversations marked as spam}}",
         "not_spam": "{count, plural, one {Conversation moved out of spam} other {# conversations moved out of spam}}",
         "mark_unread": "{count, plural, one {Conversation marked as unread} other {# conversations marked as unread}}"
+      },
+      "progress": {
+        "mark_read": "{count, plural, one {Marking conversation as read…} other {Marking # conversations as read…}}",
+        "mark_unread": "{count, plural, one {Marking conversation as unread…} other {Marking # conversations as unread…}}",
+        "star": "{count, plural, one {Starring conversation…} other {Starring # conversations…}}",
+        "unstar": "{count, plural, one {Removing star…} other {Removing stars from # conversations…}}",
+        "archive": "{count, plural, one {Archiving conversation…} other {Archiving # conversations…}}",
+        "unarchive": "{count, plural, one {Moving conversation to inbox…} other {Moving # conversations to inbox…}}",
+        "trash": "{count, plural, one {Moving conversation to trash…} other {Moving # conversations to trash…}}",
+        "restore": "{count, plural, one {Restoring conversation…} other {Restoring # conversations…}}",
+        "spam": "{count, plural, one {Marking conversation as spam…} other {Marking # conversations as spam…}}",
+        "not_spam": "{count, plural, one {Moving conversation out of spam…} other {Moving # conversations out of spam…}}"
       }
     },
     "noContent": "No content",

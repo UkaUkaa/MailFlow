@@ -66,9 +66,14 @@ const bulkResponseSchema = z.object({ updated: z.array(z.string()) });
 
 type ListSnapshot =[readonly unknown[], InfiniteData<Page<ThreadSummary>> | undefined][];
 
-interface ActionVariables {
+/** Mutation key of thread actions; the progress overlay watches it. */
+export const THREAD_ACTION_KEY = ["threads", "action"] as const;
+
+export interface ActionVariables {
   threadIds: string[];
   action: ThreadAction;
+  /** Background actions (opening a conversation marks it read) show no progress overlay. */
+  silent?: boolean;
 }
 
 /**
@@ -78,6 +83,7 @@ interface ActionVariables {
 export function useThreadAction() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: THREAD_ACTION_KEY,
     mutationFn: async ({ threadIds, action }: ActionVariables) => {
       if (threadIds.length === 1) {
         await api.post(`/threads/${encodeURIComponent(threadIds[0] ?? "")}/actions`, threadSummarySchema, { action });

@@ -3,6 +3,11 @@
 ## [Unreleased]
 
 ### Added
+- Progress for thread actions: while an action (single or bulk) waits for the server, a centred
+  card with a spinner names it and its count ("Moving 3 conversations to trash…") and blocks
+  the rest of the app (modal: pointer, keyboard and Escape) until the server answers. It fades
+  in after 200 ms so quick actions do not flash; marking a conversation read on open does not
+  show it.
 - Bulk selection in the conversation list: "Select conversations" in the list header (and a
   long press on a row on touch screens) turns rows into checkboxes; a toolbar applies mark
   read/unread, archive or move to inbox, move to trash or restore, spam / not spam and star /

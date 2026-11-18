@@ -1,9 +1,10 @@
 export { threadSummarySchema, threadDetailSchema, messageSchema, THREAD_ACTIONS } from "./types";
 export type { Message, ThreadAction, ThreadDetail, ThreadListFilter, ThreadSummary } from "./types";
-export { threadKeys, useThread, useThreadList, useThreadAction, useMessageAction } from "./api";
+export { threadKeys, THREAD_ACTION_KEY, useThread, useThreadList, useThreadAction, useMessageAction } from "./api";
 export { useThreadActions } from "./hooks/use-thread-actions";
 export { ACTION_CAPABILITY, isActionAvailable } from "./lib/capabilities";
 export { staysInView } from "./lib/optimistic";
 export { ThreadReader } from "./components/thread-reader";
+export { ThreadActionProgress } from "./components/thread-action-progress";
 export { ReaderPlaceholder } from "./components/reader-placeholder";
 export { EmailFrame } from "./components/email-frame";

@@ -3,6 +3,7 @@
 import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { ComposerProvider } from "@/modules/composer";
+import { ThreadActionProgress } from "@/modules/emails";
 import { SettingsSync } from "@/modules/settings";
 import { SessionGuard } from "@/infrastructure/authentication";
 import { AppShell } from "@/shared/components/layout/app-shell";
@@ -25,6 +26,7 @@ export function ApplicationShell({ children }: { children: ReactNode }) {
         >
           {children}
         </AppShell>
+        <ThreadActionProgress />
       </ComposerProvider>
     </SessionGuard>
   );

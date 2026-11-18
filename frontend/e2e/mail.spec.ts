@@ -217,6 +217,43 @@ test.describe("selection", () => {
     await expect(list.locator('a[href$="/mail/inbox/thread-1"]')).toHaveCount(0);
   });
 
+  test("blocks the app with a centred progress card while a bulk action runs", async ({ page }) => {
+    await mockApi(page);
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // Registered after mockApi, so it runs first: hold the request, then let the mock answer.
+    await page.route("**/api/v1/threads/actions", async (route) => {
+      await held;
+      await route.fallback();
+    });
+    await page.goto("/en/mail/inbox");
+    await page.getByRole("button", { name: "Select conversations" }).click();
+    const boxes = page.getByRole("list", { name: "Inbox" }).getByRole("checkbox");
+    await boxes.nth(0).click();
+    await boxes.nth(1).click();
+    await page.getByRole("toolbar", { name: "Actions for selected conversations" }).getByRole("button", { name: "Move to trash" }).click();
+
+    const progress = page.getByRole("dialog", { name: "Moving 2 conversations to trash…" });
+    await expect(progress).toBeVisible();
+    const box = await progress.boundingBox();
+    const viewport = page.viewportSize();
+    expect(Math.abs((box?.x ?? 0) + (box?.width ?? 0) / 2 - (viewport?.width ?? 0) / 2)).toBeLessThan(2);
+    // Everything else is blocked: a click elsewhere does not reach the page.
+    // Everything else is blocked: a click on the filter does not reach it, Escape does not close.
+    const filter = page.locator('button[aria-label="Show unread only"]');
+    const target = await filter.boundingBox();
+    await page.mouse.click((target?.x ?? 0) + 4, (target?.y ?? 0) + 4);
+    await page.keyboard.press("Escape");
+    await expect(progress).toBeVisible();
+    await expect(filter).toHaveAttribute("aria-pressed", "false");
+
+    release();
+    await expect(progress).toBeHidden();
+    await expect(page.getByText("2 conversations moved to trash")).toBeVisible();
+  });
+
   test("selects all loaded conversations and leaves with Escape", async ({ page }) => {
     await mockApi(page);
     await page.goto("/en/mail/inbox");
