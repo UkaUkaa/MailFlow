@@ -24,6 +24,10 @@ export async function generateMetadata({ params }: { params: Promise<{ locale: s
     title: { default: "MailFlow", template: "%s · MailFlow" },
     description: t("description"),
     robots: { index: false, follow: false },
+    // Home-screen install: with the manifest (`app/manifest.ts`) these make iOS open MailFlow as a
+    // standalone app with its own icon and no browser chrome.
+    appleWebApp: { capable: true, title: "MailFlow", statusBarStyle: "default" },
+    icons: { apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }] },
   };
 }
 
