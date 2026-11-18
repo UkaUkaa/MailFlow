@@ -71,7 +71,7 @@ Password policy: 10–128 characters.
 | GET | `/settings` | — | `Settings` |
 | PATCH | `/settings` | partial `Settings` | `Settings` |
 
-`Settings`: `{locale:"en"|"uk", theme:"system"|"light"|"dark", load_remote_images:boolean, conversation_view:boolean}`.
+`Settings`: `{locale:"en"|"uk", theme:"system"|"light"|"dark", load_remote_images:boolean, conversation_view:boolean, list_density:"comfortable"|"compact", list_preview_lines:0|1|2, show_avatars:boolean, account_tint:"off"|"subtle"|"strong", accent_color:"blue"|"violet"|"green"|"orange"|"pink"|"graphite", reader_text_size:"small"|"default"|"large"}`. Any other value is a 422.
 
 ## Accounts — `/accounts`
 
@@ -84,10 +84,13 @@ Password policy: 10–128 characters.
 | POST | `/accounts/{id}/reconnect` | `{locale?}` | `{authorization_url}`. OAuth mailboxes only; an IMAP mailbox answers 422 `unsupported` |
 | POST | `/accounts/imap` | `ImapConnect` | `201 Account` (new) or `200 Account` (this address was already connected: credentials replaced). Both logins are tried first |
 | POST | `/accounts/{id}/imap/credentials` | `{password}` | `200 Account`. New password for an IMAP mailbox; servers and user name stay as stored. 404 unless it is an IMAP mailbox of the caller |
-| PATCH | `/accounts/{id}` | `{display_name?, color?}` | `Account` |
+| PATCH | `/accounts/{id}` | `{display_name?, color?}` | `Account`. `color` is any `#rrggbb` (case-insensitive, stored lower case); anything else is 422 |
+| PUT | `/accounts/{id}/avatar` | multipart `file` | `Account`. PNG, JPEG or WebP, recognised from the bytes (the declared type is ignored), at most 128 KB (413 above, 422 for other types). 60/hour |
+| DELETE | `/accounts/{id}/avatar` | — | `Account` without a picture |
+| GET | `/accounts/{id}/avatar?v=…` | — | The picture with its recognised `Content-Type`, `nosniff`, a sandbox CSP and `Cache-Control: private, max-age=31536000, immutable` (`v` is the version from `avatar_updated_at`). 404 when there is none |
 | DELETE | `/accounts/{id}` | — | `204` (credentials revoked and purged, mail data deleted) |
 
-`Account`: `{id, provider, email_address, display_name, color, status, status_reason, capabilities, created_at, sync:{status, last_synced_at, last_error_code}}`
+`Account`: `{id, provider, email_address, display_name, color, avatar_updated_at, status, status_reason, capabilities, created_at, sync:{status, last_synced_at, last_error_code}}`
 where `status` ∈ `active | needs_reauth | error | disabled` and `sync.status` ∈
 `idle | queued | running | error`.
 

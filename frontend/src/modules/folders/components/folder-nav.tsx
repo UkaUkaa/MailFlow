@@ -5,7 +5,9 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { anyAccountSupports, useAccounts, type CapabilityName } from "@/modules/accounts";
 import { Link } from "@/infrastructure/i18n/navigation";
+import { navGroup, navIcon, navLabel, navRow, navRowBox, navTrailing } from "@/shared/components/layout/nav-row";
 import { Tooltip } from "@/shared/components/ui/tooltip";
+import { cn } from "@/shared/lib/cn";
 import { useFolderCounts, useFolders } from "../api";
 import { SYSTEM_VIEWS, folderViewSlug, type SystemView } from "../types";
 
@@ -26,22 +28,22 @@ const VIEW_CAPABILITY: Partial<Record<SystemView, CapabilityName>> = {
   spam: "spam",
 };
 
-const itemClasses =
-  "flex h-9 min-w-0 items-center gap-2.5 rounded-md px-2.5 text-sm text-foreground-muted transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-accent-soft aria-[current=page]:font-medium aria-[current=page]:text-accent touch:h-11";
-
 function formatCount(count: number): string {
   return count > 999 ? "999+" : String(count);
 }
 
-export function FolderNav({ onNavigate }: { onNavigate?: () => void }) {
+/**
+ * Mail views of the navigation column. One list of rows for both states of the column:
+ * collapsed shows the icon cell (unread as a dot, the label as a tooltip), expanded shows the
+ * label and the unread count as well. See `shared/components/layout/nav-row.ts`.
+ */
+export function FolderNav({ onNavigate, expanded = true }: { onNavigate?: () => void; expanded?: boolean }) {
   const t = useTranslations("nav");
   const params = useParams<{ view?: string }>();
   const searchParams = useSearchParams();
   const accountId = searchParams.get("account");
   const counts = useFolderCounts(accountId);
-  const folders = useFolders(accountId, Boolean(accountId));
   const query = accountId ? { account: accountId } : undefined;
-  const customFolders = (folders.data ?? []).filter((folder) => folder.role === "custom");
 
   // One mailbox selected: its own capabilities. Unified: a view stays while any mailbox has it.
   // Until the mailboxes are known nothing is hidden, and the open view never disappears.
@@ -53,34 +55,37 @@ export function FolderNav({ onNavigate }: { onNavigate?: () => void }) {
   });
 
   const unread = (role: SystemView): number =>
-    counts.data?.find((item) => item.role === role)?.unread_count ?? 0;
+    role === "sent" || role === "trash" || role === "archive" ? 0 : (counts.data?.find((item) => item.role === role)?.unread_count ?? 0);
 
   return (
     <nav aria-label={t("folders")}>
-      <ul className="flex flex-col gap-0.5">
+      <ul className={navGroup}>
         {views.map((role) => {
           const Icon = VIEW_ICONS[role];
-          const count = role === "sent" || role === "trash" || role === "archive" ? 0 : unread(role);
+          const count = unread(role);
           const label = t(`views.${role}`);
           return (
             <li key={role}>
-              <Tooltip label={label} side="right">
+              <Tooltip label={label} side="right" disabled={expanded}>
                 <Link
                   href={{ pathname: `/mail/${role}`, query }}
                   aria-current={params.view === role ? "page" : undefined}
                   aria-label={count > 0 ? t("viewWithUnread", { view: label, count }) : label}
                   onClick={onNavigate}
-                  className={itemClasses}
+                  className={navRow}
                 >
-                  <span className="relative inline-flex shrink-0">
-                    <Icon className="size-4" aria-hidden />
+                  <span className={navIcon}>
+                    <Icon aria-hidden />
                     {count > 0 ? (
-                      <span aria-hidden className="sb-collapsed absolute -top-1 -right-1 size-1.5 rounded-full bg-accent" />
+                      <span
+                        aria-hidden
+                        className="mf-nav-rail-only absolute top-0.5 right-0.5 size-2 rounded-full border-2 border-rail bg-accent touch:top-2 touch:right-2"
+                      />
                     ) : null}
                   </span>
-                  <span className="sb-expanded min-w-0 flex-1 truncate">{label}</span>
+                  <span className={navLabel}>{label}</span>
                   {count > 0 ? (
-                    <span aria-hidden className="sb-expanded shrink-0 text-xs font-medium tabular-nums">
+                    <span aria-hidden className={navTrailing}>
                       {formatCount(count)}
                     </span>
                   ) : null}
@@ -90,29 +95,46 @@ export function FolderNav({ onNavigate }: { onNavigate?: () => void }) {
           );
         })}
       </ul>
-      {customFolders.length > 0 ? (
-        <div className="sb-expanded mt-4">
-          <h3 className="px-2.5 pb-1 text-xs font-medium text-foreground-subtle">{t("labels")}</h3>
-          <ul className="flex flex-col gap-0.5">
-            {customFolders.map((folder) => (
-              <li key={folder.id}>
-                <Link
-                  href={{ pathname: `/mail/${folderViewSlug(folder.id)}`, query }}
-                  aria-current={params.view === folderViewSlug(folder.id) ? "page" : undefined}
-                  onClick={onNavigate}
-                  className={itemClasses}
-                >
-                  <FolderIcon className="size-4 shrink-0" aria-hidden />
-                  <span className="min-w-0 flex-1 truncate">{folder.name}</span>
-                  {folder.unread_count > 0 ? (
-                    <span className="shrink-0 text-xs font-medium tabular-nums">{formatCount(folder.unread_count)}</span>
-                  ) : null}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+    </nav>
+  );
+}
+
+/**
+ * The selected mailbox's own folders. They only exist in the expanded column (a column of
+ * identical folder icons would say nothing), below everything that both states share.
+ */
+export function CustomFolderNav({ onNavigate }: { onNavigate?: () => void }) {
+  const t = useTranslations("nav");
+  const params = useParams<{ view?: string }>();
+  const accountId = useSearchParams().get("account");
+  const folders = useFolders(accountId, Boolean(accountId));
+  const query = accountId ? { account: accountId } : undefined;
+  const customFolders = (folders.data ?? []).filter((folder) => folder.role === "custom");
+  if (customFolders.length === 0) return null;
+
+  return (
+    <nav aria-label={t("labels")}>
+      <h3 className={cn(navRowBox, "h-8 items-end px-2 pb-1.5 text-xs font-medium text-foreground-muted touch:h-9")}>
+        <span className="mf-nav-label truncate">{t("labels")}</span>
+      </h3>
+      <ul className={navGroup}>
+        {customFolders.map((folder) => (
+          <li key={folder.id}>
+            <Link
+              href={{ pathname: `/mail/${folderViewSlug(folder.id)}`, query }}
+              aria-current={params.view === folderViewSlug(folder.id) ? "page" : undefined}
+              onClick={onNavigate}
+              className={navRow}
+            >
+              <span className={navIcon}>
+                <FolderIcon aria-hidden />
+              </span>
+              <span className={navLabel}>{folder.name}</span>
+              {folder.unread_count > 0 ? <span className={navTrailing}>{formatCount(folder.unread_count)}</span> : null}
+            </Link>
+          </li>
+        ))}
+      </ul>
     </nav>
   );
 }

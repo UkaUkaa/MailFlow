@@ -3,6 +3,24 @@
 ## [Unreleased]
 
 ### Added
+- Settings → Interface: message-list density (comfortable / compact), preview lines (off / 1 / 2),
+  sender pictures on/off, mailbox colour wash (off / subtle / strong), app accent colour (blue,
+  violet, green, orange, pink, graphite) and the reader's base text size, with a live preview
+  and "Reset to defaults". Stored on the account (`/settings`, migration `0003`) and applied
+  through `<html>` data attributes, cached locally so a reload does not flash the default layout.
+- Account appearance: any RGB colour per mailbox (presets, the platform colour picker or a hex
+  code) and an optional picture (PNG/JPEG/WebP, cropped and re-encoded to 96×96 in the browser;
+  its average colour is suggested). `PUT`/`DELETE`/`GET /accounts/{id}/avatar`,
+  `Account.avatar_updated_at`. The picture replaces the colour dot in the list, the reader, the
+  account switcher and settings.
+- Message rows in the thread list are washed with their mailbox colour (theme tokens
+  `--account-tint-rest` / `--account-tint-hover`), with a preview in the edit dialog.
+
+### Fixed
+- Saving an account colour failed with 422: the UI sent hex values, the API accepted only colour
+  names. Colours are now `#rrggbb` throughout (migration `0002` converts stored names).
+
+### Added
 - Architecture, security, data-ownership, provider, responsive and design-system documentation;
   `AGENTS.md`, `CLAUDE.md`, agent definitions.
 - Backend (FastAPI modular monolith): authentication (registration, verification, login, logout,
@@ -61,7 +79,41 @@
 - `/accounts/oauth/outlook/start` answers 503 `provider_not_configured` instead of 404 when
   Outlook is not configured.
 
+### Changed
+- Frontend layout reworked after `docs/design/SPARK_REFERENCE.md` (layout and behaviour only;
+  MailFlow's own palette, mark and Lucide icons):
+  - navigation: 70px icon rail from 768px with tooltips, a flyout with the full navigation
+    (keyboard operable, focus returns) and an optional pinned sidebar; phones keep bottom
+    navigation and drawer;
+  - thread list: date groups (Today … month + year, browser time zone, locale week start),
+    88px three-line rows with avatars, count chip, gutter quick actions on hover and keyboard
+    focus, accent-tint selection, search and new-message icons in the header;
+  - reader: toolbar pill (back | archive) and icon buttons, messages as bordered cards with
+    per-message reply / forward, collapsed quoted history, compact draft card (Edit / Delete),
+    glyph-only empty pane;
+  - composer: document-like page beside the rail from 768px, replies docked in the reading pane
+    from 1024px (expand / dock), one "To, Cc, Bcc" line that opens on focus;
+  - search: a mode of the list pane with in-memory recent queries; Escape returns to the list;
+  - settings: modal dialog over the mail workspace from 768px (deep links and the OAuth return
+    open it directly), full pages on phones.
+- Design tokens: new `--rail`; neutrals re-tuned into three tonal steps in both themes;
+  `--warning`, `--success`, `--danger` (light) and `--accent` (dark) adjusted; contrast table in
+  `DESIGN_SYSTEM.md`.
+- Removed strings `nav.toggleSidebar`, `composer.minimize`, `composer.ccBcc`,
+  `mail.searchPrompt*`; the floating, minimizable composer is gone.
+
+- Navigation is one layout: the collapsed rail and the expanded menu are the same rows (fixed
+  icon cell + label), so expanding only widens the column (animated, 180ms) and reveals labels
+  and unread counts; no icon, the toggle included, changes position. Accounts are rows of the
+  column in both states; language and theme are the same two rows ("Language: …", "Theme: …");
+  the stored state is applied before first paint. The overlay flyout, the accent Compose button
+  and the segmented switches in the menu are removed; the phone drawer uses the same rows.
+- Navigation: an "Expand menu" button on the rail and "Collapse menu" in the menu header;
+  language and theme switches in the rail (compact) and in the full menu and phone drawer.
+
 ### Fixed
+- Escape did not close the composer while the caret was in the message body.
+- Closing the phone drawer did not return focus to the menu button.
 - Search by email address returned nothing (tsquery tokenisation).
 - A conversation left an empty stale row when a draft moved to another thread.
 - Hydration mismatch when the page was delivered buffered behind Nginx (theme script in `<head>`).

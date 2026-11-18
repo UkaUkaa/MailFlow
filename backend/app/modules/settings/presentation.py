@@ -19,6 +19,12 @@ class SettingsResponse(BaseModel):
     theme: Literal["system", "light", "dark"]
     load_remote_images: bool
     conversation_view: bool
+    list_density: Literal["comfortable", "compact"]
+    list_preview_lines: Literal[0, 1, 2]
+    show_avatars: bool
+    account_tint: Literal["off", "subtle", "strong"]
+    accent_color: Literal["blue", "violet", "green", "orange", "pink", "graphite"]
+    reader_text_size: Literal["small", "default", "large"]
 
 
 class SettingsUpdate(BaseModel):
@@ -27,6 +33,12 @@ class SettingsUpdate(BaseModel):
     theme: Literal["system", "light", "dark"] | None = None
     load_remote_images: bool | None = None
     conversation_view: bool | None = None
+    list_density: Literal["comfortable", "compact"] | None = None
+    list_preview_lines: Literal[0, 1, 2] | None = None
+    show_avatars: bool | None = None
+    account_tint: Literal["off", "subtle", "strong"] | None = None
+    accent_color: Literal["blue", "violet", "green", "orange", "pink", "graphite"] | None = None
+    reader_text_size: Literal["small", "default", "large"] | None = None
 
 
 @router.get("", response_model=SettingsResponse)

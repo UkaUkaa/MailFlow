@@ -70,7 +70,10 @@ test.describe("inbox", () => {
 
   test("searches mail", async ({ page }) => {
     await mockApi(page);
-    await page.goto("/en/mail/inbox");
+    await page.goto("/en/mail/sent");
+    await page.getByRole("link", { name: "Search", exact: true }).click();
+    await expect(page).toHaveURL(/\/en\/mail\/search$/);
+    await expect(page.getByRole("searchbox", { name: "Search mail" })).toBeFocused();
     await page.getByRole("searchbox", { name: "Search mail" }).fill("invoice");
     await page.getByRole("searchbox", { name: "Search mail" }).press("Enter");
     await expect(page).toHaveURL(/\/en\/mail\/search\?q=invoice$/);
@@ -80,6 +83,20 @@ test.describe("inbox", () => {
     await page.getByRole("searchbox", { name: "Search mail" }).fill("nothing");
     await page.getByRole("searchbox", { name: "Search mail" }).press("Enter");
     await expect(page.getByRole("heading", { name: "No results" })).toBeVisible();
+
+    // Clearing goes back to the suggestions: this session's queries, newest first, and no operators.
+    await page.getByRole("button", { name: "Clear search" }).click();
+    const recent = page.getByRole("region", { name: "Recent searches" }).getByRole("link");
+    await expect(recent).toHaveText(["nothing", "invoice"]);
+    await expect(page.getByText(/from:|has:|subject:/)).toHaveCount(1); // only the note that operators are not supported
+    await recent.last().click();
+    await expect(page).toHaveURL(/\/en\/mail\/search\?q=invoice$/);
+    expect(await page.evaluate(() => JSON.stringify(window.localStorage))).not.toContain("invoice");
+
+    // Escape leaves search for the list the user came from.
+    await page.getByRole("searchbox", { name: "Search mail" }).press("Escape");
+    await expect(page).toHaveURL(/\/en\/mail\/sent$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Sent" })).toBeVisible();
   });
 
   test("starts a manual synchronization", async ({ page }) => {

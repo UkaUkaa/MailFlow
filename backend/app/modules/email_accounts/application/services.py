@@ -32,8 +32,11 @@ from app.modules.email_accounts.application.sessions import (
 from app.modules.email_accounts.domain import (
     ACCOUNT_COLORS,
     MAX_ACCOUNTS_PER_USER,
+    MAX_AVATAR_BYTES,
     AccountStatus,
     EmailAccount,
+    avatar_media_type,
+    normalize_color,
 )
 from app.modules.token_vault.application import Cipher, TokenVault
 from app.modules.token_vault.domain import CredentialKind, SealedSecret, VaultError
@@ -43,6 +46,7 @@ from app.shared.domain.errors import (
     FieldProblem,
     InvalidInputError,
     NotFoundError,
+    PayloadTooLargeError,
     ProviderNotConfiguredError,
     UnsupportedError,
 )
@@ -345,11 +349,13 @@ class AccountService:
         vault: TokenVault,
         registry: ProviderRegistry,
         audit: AuditLog,
+        clock: Clock,
     ) -> None:
         self._accounts = accounts
         self._vault = vault
         self._registry = registry
         self._audit = audit
+        self._clock = clock
 
     async def list(self, user_id: uuid.UUID) -> list[EmailAccount]:
         return await self._accounts.list(user_id)
@@ -369,13 +375,41 @@ class AccountService:
         color: str | None,
     ) -> EmailAccount:
         await self.get(user_id, account_id)
-        if color is not None and color not in ACCOUNT_COLORS:
-            raise InvalidInputError(problems=[FieldProblem("color", "unsupported")])
+        if color is not None:
+            color = normalize_color(color)
+            if color is None:
+                raise InvalidInputError(problems=[FieldProblem("color", "unsupported")])
         name = " ".join(display_name.split())[:100] if display_name is not None else None
         if display_name is not None and not name:
             raise InvalidInputError(problems=[FieldProblem("display_name", "required")])
         await self._accounts.update(user_id, account_id, display_name=name, color=color)
         return await self.get(user_id, account_id)
+
+    async def set_avatar(
+        self, user_id: uuid.UUID, account_id: uuid.UUID, content: bytes
+    ) -> EmailAccount:
+        """Replace the account picture. The type is taken from the bytes, never the upload."""
+        await self.get(user_id, account_id)
+        if len(content) > MAX_AVATAR_BYTES:
+            raise PayloadTooLargeError("The picture exceeds the size limit.")
+        media_type = avatar_media_type(content)
+        if media_type is None:
+            raise InvalidInputError(problems=[FieldProblem("file", "unsupported_type")])
+        await self._accounts.set_avatar(
+            user_id, account_id, (media_type, content), self._clock.now()
+        )
+        return await self.get(user_id, account_id)
+
+    async def remove_avatar(self, user_id: uuid.UUID, account_id: uuid.UUID) -> EmailAccount:
+        await self.get(user_id, account_id)
+        await self._accounts.set_avatar(user_id, account_id, None, self._clock.now())
+        return await self.get(user_id, account_id)
+
+    async def avatar(self, user_id: uuid.UUID, account_id: uuid.UUID) -> tuple[str, bytes]:
+        found = await self._accounts.get_avatar(user_id, account_id)
+        if found is None:
+            raise NotFoundError
+        return found
 
     async def disconnect(self, user_id: uuid.UUID, account_id: uuid.UUID) -> None:
         """Revoke the provider grant (best effort), then delete credentials and all mail data.

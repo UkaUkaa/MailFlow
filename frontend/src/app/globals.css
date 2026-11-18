@@ -1,6 +1,11 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* Interface preferences (Settings → Interface), mirrored on <html> (interface-preferences.ts). */
+@custom-variant compact (&:where([data-density="compact"] *));
+@custom-variant preview-none (&:where([data-preview="0"] *));
+@custom-variant preview-two (&:where([data-preview="2"] *));
+@custom-variant no-avatars (&:where([data-avatars="off"] *));
 /* Finger-sized controls: coarse pointers and all phone widths. */
 @custom-variant touch {
   @media (pointer: coarse) {
@@ -13,55 +18,177 @@
 
 :root {
   color-scheme: light;
-  --background: #ffffff;
-  --surface: #f7f7f8;
+  /* Three tonal steps: rail (deepest) -> background (reading pane) -> surface (list pane, cards). */
+  --rail: #e9e9ee;
+  --background: #f5f5f7;
+  --surface: #ffffff;
   --surface-raised: #ffffff;
-  --muted: #f0f0f2;
-  --border: #e6e6ea;
-  --border-strong: #d2d2d9;
+  --muted: #ececf0;
+  --border: #e2e2e8;
+  --border-strong: #cfcfd8;
   --foreground: #17181c;
   --foreground-muted: #5d5f6b;
-  --foreground-subtle: #767885;
+  --foreground-subtle: #686a77;
   --accent: #3355e0;
   --accent-hover: #2947c7;
   --accent-foreground: #ffffff;
-  --accent-soft: #eef1fd;
-  --danger: #c93a3a;
+  --accent-soft: #e6ebfd;
+  --danger: #c43535;
   --danger-soft: #fdf0f0;
-  --success: #1f8a4c;
-  --warning: #a86a00;
+  --success: #197a42;
+  --warning: #8f5a00;
   --warning-soft: #fdf6e7;
   --overlay: rgb(15 16 20 / 0.45);
   --elev-sm: 0 1px 2px rgb(15 16 20 / 0.06), 0 4px 12px rgb(15 16 20 / 0.06);
   --elev-lg: 0 4px 10px rgb(15 16 20 / 0.06), 0 20px 48px rgb(15 16 20 / 0.16);
+  /* Width of the navigation column: nothing on phones, the icon rail from md, the expanded menu. */
+  --nav-width: 0px;
+  --nav-offset: calc(var(--nav-width) + env(safe-area-inset-left, 0px));
+  /* Share of the mailbox colour mixed into a message row (`.account-tint`). */
+  --account-tint-rest: 7%;
+  --account-tint-hover: 12%;
+}
+
+@media (min-width: 48rem) {
+  :root {
+    --nav-width: 4.375rem;
+  }
+  :root[data-nav="expanded"] {
+    --nav-width: 15rem;
+  }
+}
+
+/*
+ * Registered as a length so that it can be transitioned: the column, and everything positioned
+ * beside it (the composer), then move together. `data-nav-ready` is set after hydration, so
+ * nothing slides while the page loads.
+ */
+@property --nav-width {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+:root[data-nav-ready] {
+  transition: --nav-width 180ms ease-out;
 }
 
 [data-theme="dark"] {
   color-scheme: dark;
-  --background: #0c0d0f;
-  --surface: #121316;
-  --surface-raised: #191b1f;
-  --muted: #1e2025;
-  --border: #26282e;
-  --border-strong: #363941;
+  --rail: #0a0b0d;
+  --background: #17181c;
+  --surface: #202227;
+  --surface-raised: #24262c;
+  --muted: #2c2f36;
+  --border: #30333b;
+  --border-strong: #444852;
   --foreground: #ededf0;
-  --foreground-muted: #a0a3ad;
-  --foreground-subtle: #80838f;
-  --accent: #7d95ff;
-  --accent-hover: #93a7ff;
+  --foreground-muted: #adb0ba;
+  --foreground-subtle: #9497a3;
+  --accent: #8098ff;
+  --accent-hover: #96aaff;
   --accent-foreground: #0c0d0f;
-  --accent-soft: #1a2040;
-  --danger: #f07070;
-  --danger-soft: #2a1516;
+  --accent-soft: #27315e;
+  --danger: #f27878;
+  --danger-soft: #2e191b;
   --success: #4cc38a;
   --warning: #e0a83a;
-  --warning-soft: #2a2110;
+  --warning-soft: #2e2513;
   --overlay: rgb(0 0 0 / 0.6);
   --elev-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
   --elev-lg: 0 4px 10px rgb(0 0 0 / 0.4), 0 20px 48px rgb(0 0 0 / 0.5);
+  /* Dark surfaces need a little more of the colour for the same perceived wash. */
+  --account-tint-rest: 10%;
+  --account-tint-hover: 14%;
+}
+
+/*
+ * Accent palettes (Settings → Interface → Accent colour). Blue repeats the defaults above so that
+ * an element of its own (a swatch) can show any palette inside a page with another accent. Each
+ * keeps accent-foreground on accent and accent on accent-soft at WCAG AA in both themes
+ * (interface-preferences.test.ts).
+ */
+[data-accent="blue"] {
+  --accent: #3355e0;
+  --accent-hover: #2947c7;
+  --accent-soft: #e6ebfd;
+}
+[data-accent="violet"] {
+  --accent: #6d3fd6;
+  --accent-hover: #5c31bf;
+  --accent-soft: #efe9fc;
+}
+[data-accent="green"] {
+  --accent: #1d7348;
+  --accent-hover: #17603c;
+  --accent-soft: #e2f3e9;
+}
+[data-accent="orange"] {
+  --accent: #b0470b;
+  --accent-hover: #963c09;
+  --accent-soft: #fcebdf;
+}
+[data-accent="pink"] {
+  --accent: #c02a69;
+  --accent-hover: #a5235a;
+  --accent-soft: #fbe6ef;
+}
+[data-accent="graphite"] {
+  --accent: #3f4250;
+  --accent-hover: #2f313c;
+  --accent-soft: #e8e9ee;
+}
+[data-accent="blue"][data-theme="dark"],
+[data-theme="dark"] [data-accent="blue"] {
+  --accent: #8098ff;
+  --accent-hover: #96aaff;
+  --accent-soft: #27315e;
+}
+[data-accent="violet"][data-theme="dark"],
+[data-theme="dark"] [data-accent="violet"] {
+  --accent: #b195ff;
+  --accent-hover: #c2abff;
+  --accent-soft: #34295a;
+}
+[data-accent="green"][data-theme="dark"],
+[data-theme="dark"] [data-accent="green"] {
+  --accent: #5fcf96;
+  --accent-hover: #7adba8;
+  --accent-soft: #1d3a2c;
+}
+[data-accent="orange"][data-theme="dark"],
+[data-theme="dark"] [data-accent="orange"] {
+  --accent: #ff9a5c;
+  --accent-hover: #ffad7a;
+  --accent-soft: #42291a;
+}
+[data-accent="pink"][data-theme="dark"],
+[data-theme="dark"] [data-accent="pink"] {
+  --accent: #ff85b5;
+  --accent-hover: #ff9fc5;
+  --accent-soft: #432232;
+}
+[data-accent="graphite"][data-theme="dark"],
+[data-theme="dark"] [data-accent="graphite"] {
+  --accent: #c4c6d0;
+  --accent-hover: #d6d8e0;
+  --accent-soft: #383a43;
+}
+
+/*
+ * Mailbox colour wash strength (Settings → Interface). "subtle" is the default above. The hover
+ * share is capped by muted-text contrast on the most extreme colours (account-colors.test.ts).
+ */
+[data-tint="strong"] {
+  --account-tint-rest: 10%;
+  --account-tint-hover: 14%;
+}
+[data-tint="strong"][data-theme="dark"] {
+  --account-tint-rest: 13%;
+  --account-tint-hover: 15%;
 }
 
 @theme inline {
+  --color-rail: var(--rail);
   --color-background: var(--background);
   --color-surface: var(--surface);
   --color-surface-raised: var(--surface-raised);
@@ -188,38 +315,27 @@
   scrollbar-color: var(--border-strong) transparent;
 }
 
-/* Sidebar: rail by default, full from xl, user override through data-collapsed. */
+/*
+ * Navigation column: one layout, collapsed (icon rail) or expanded. Only the width changes;
+ * labels are clipped by their rows and faded, rail-only marks (unread dots) fade the other way.
+ */
 .mf-sidebar {
-  width: 3.5rem;
+  width: var(--nav-offset);
 }
-.mf-sidebar .sb-expanded {
-  display: none;
+.mf-nav-label {
+  opacity: 0;
+  transition: opacity 150ms ease-out;
 }
-.mf-sidebar[data-collapsed="false"],
-.mf-sidebar[data-variant="drawer"] {
-  width: 15rem;
+.mf-nav-rail-only {
+  transition: opacity 150ms ease-out;
 }
-.mf-sidebar[data-variant="drawer"] {
-  width: 100%;
+:root[data-nav="expanded"] .mf-sidebar .mf-nav-label,
+.mf-nav-open .mf-nav-label {
+  opacity: 1;
 }
-.mf-sidebar[data-collapsed="false"] .sb-expanded,
-.mf-sidebar[data-variant="drawer"] .sb-expanded {
-  display: block;
-}
-.mf-sidebar[data-collapsed="false"] .sb-collapsed,
-.mf-sidebar[data-variant="drawer"] .sb-collapsed {
-  display: none;
-}
-@media (min-width: 80rem) {
-  .mf-sidebar[data-collapsed="auto"] {
-    width: 15rem;
-  }
-  .mf-sidebar[data-collapsed="auto"] .sb-expanded {
-    display: block;
-  }
-  .mf-sidebar[data-collapsed="auto"] .sb-collapsed {
-    display: none;
-  }
+:root[data-nav="expanded"] .mf-sidebar .mf-nav-rail-only,
+.mf-nav-open .mf-nav-rail-only {
+  opacity: 0;
 }
 
 /* Rich text editor */
@@ -262,4 +378,32 @@
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/*
+ * Mailbox colour wash for message rows and their preview: a small share of the account colour
+ * (`--account-tint`, set inline) mixed into the list surface, so rows are told apart at a glance
+ * without competing with the text. A hairline of plain surface separates neighbouring rows of the
+ * same mailbox. Text on it keeps AA contrast (DESIGN_SYSTEM.md).
+ */
+@layer components {
+  .account-tint {
+    background-color: color-mix(in oklab, var(--account-tint) var(--account-tint-rest), var(--surface));
+    box-shadow: inset 0 -1px 0 var(--surface);
+  }
+  @media (hover: hover) {
+    .account-tint:hover {
+      background-color: color-mix(in oklab, var(--account-tint) var(--account-tint-hover), var(--surface));
+    }
+  }
+  /* Tint switched off: rows look like untinted ones. */
+  [data-tint="off"] .account-tint {
+    background-color: transparent;
+    box-shadow: none;
+  }
+  @media (hover: hover) {
+    [data-tint="off"] .account-tint:hover {
+      background-color: color-mix(in oklab, var(--muted) 60%, transparent);
+    }
+  }
 }

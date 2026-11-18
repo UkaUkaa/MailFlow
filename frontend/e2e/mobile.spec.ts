@@ -92,8 +92,11 @@ test.describe("mobile navigation", () => {
     const height = await composer.evaluate((element) => element.getBoundingClientRect().height);
     expect(Math.round(height)).toBe(430);
 
+    // One "To, Cc, Bcc" line until the recipients get focus.
+    await expect(composer.getByLabel("Bcc")).toHaveCount(0);
+    await expect(composer.getByPlaceholder("To, Cc, Bcc")).toBeVisible();
     await composer.getByLabel("To").fill("daniel@okafor.example,");
-    await composer.getByRole("button", { name: "Cc/Bcc" }).tap();
+    await expect(composer.getByLabel("Cc", { exact: true })).toBeVisible();
     await expect(composer.getByLabel("Bcc")).toBeVisible();
     await composer.getByLabel("Subject").fill("From my phone");
     await send.tap();

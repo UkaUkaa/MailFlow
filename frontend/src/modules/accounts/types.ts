@@ -23,6 +23,8 @@ export const accountSchema = z.object({
   email_address: z.string(),
   display_name: z.string().nullable(),
   color: z.string().nullable(),
+  /** Set when the mailbox has a picture; changes whenever the picture does. */
+  avatar_updated_at: z.string().nullable().optional(),
   status: accountStatusSchema,
   status_reason: z.string().nullable().optional(),
   capabilities: capabilitiesSchema,

@@ -109,6 +109,32 @@ Honest list of what is missing or partial. Update whenever something here change
 - A reopened draft loads its quoted text in simplified form.
 - The `conversation_view` setting is stored but has no UI.
 
+- A draft inside a conversation can be edited or deleted from its card but not sent from it:
+  sending needs the full composer state (recipient validation, attachments, idempotency key).
+  Opening a reply does not add a draft card to the conversation until the draft is stored and
+  the conversation reloads.
+- Quoted history is collapsed only for `blockquote` blocks that end a message; providers that
+  mark quotes with a class or a plain "On … wrote:" line are not detected (the sanitizer strips
+  classes).
+- Search suggestions offer no operators (`from:`, `has:` …): the search API has none.
+- Sender avatars are initials on a colour; no pictures (Gravatar, provider photos) are loaded.
+  Only the user's own mailboxes can have a picture, uploaded by the user.
+- Account pictures are validated by file signature only; the server does not decode them. They
+  are shown only in `<img>` to their owner, so a malformed file can at worst fail to render.
+- The message-row wash is always on; there is no setting to turn it off.
+- Navigation: the language and theme rows show "Language: English" / "Theme: System" while their
+  accessible names are "Switch language to …" / "Switch theme to …" (WCAG 2.5.3 is not met
+  literally). When the column is collapsed and the window is short, the views and accounts
+  scroll without a visible scrollbar. A mailbox's own folders are reachable only with the menu
+  expanded (or in the phone drawer). The width animation needs `@property` (Chromium, Safari
+  16.4+, Firefox 128+); elsewhere the column switches instantly.
+- Behind the settings dialog the list of the last mail view is shown without the open
+  conversation.
+- The date headings do not update at midnight until the list re-renders.
+- The light theme has no reference observation; it was derived from the dark roles.
+- Not visually verified on real devices or in Safari / Firefox: the new layout was reviewed in
+  Chromium screenshots only. The draft card is covered by unit tests but has no screenshot.
+
 ## Accounts
 
 - A deactivated MailFlow account cannot be reactivated through the UI.

@@ -147,3 +147,101 @@ The provider session (`ProviderSessionFactory.open`) is per use case, so the ada
 lazily and is closed when the session ends. Pooling connections across requests and workers
 would need per-account connection ownership and idle handling; deferred until latency against
 real servers shows it is needed.
+
+## D31 — Adopt the reference client's layout, not its identity
+The frontend follows `docs/design/SPARK_REFERENCE.md` for layout, structure, density, states and
+behaviour: icon rail that expands in place, date-grouped three-line list with avatars and
+gutter quick actions, messages as cards, document-like composer and docked reply, search as a
+mode of the list, settings as a dialog. Name, logo, glyphs, illustrations and colour values are
+not taken: the palette stays MailFlow's (ink-blue accent, own neutrals), icons are Lucide, the
+empty pane uses an open-envelope glyph. Deliberately **not** carried over, because MailFlow has
+no such feature and a control must do something real: pin, snooze, assign, share, AI, calendar,
+priority toggle, smart category cards, agents entry, templates, reminders, send later,
+send-and-archive, pop-out window, view switcher and sort mode in the list header.
+
+## D32 — Three tonal surfaces, also in the light theme
+Panes are separated by tone (`--rail` → `--background` → `--surface`), without divider lines.
+The dark theme was observable; the light theme was derived from the same roles (most tinted
+rail, faint grey reading pane, white list and cards). The neutrals were re-tuned for this and
+re-measured for WCAG AA (table in `DESIGN_SYSTEM.md`); `--warning`, `--success` and `--danger`
+were darkened in light because they no longer reached 4.5:1 on the grey canvas.
+
+## D33 — Settings dialog: a layout over the workspace, not intercepting routes
+From 768px the settings routes render as a modal dialog. Next's intercepting routes show a modal
+only after a soft navigation; a reload, a deep link or the OAuth return would have rendered the
+plain page instead, giving two presentations of one URL. The settings layout therefore always
+renders the mail workspace (inert) behind the dialog, and the URL stays the single source of
+truth. The dialog's geometry is CSS (no hydration flash); role, Escape, focus containment and
+`inert` are switched on in script. Radix `Dialog` is not used for this frame because switching
+between its modal and non-modal content remounts the children, which would run the OAuth-result
+effect twice.
+
+## D34 — Where the reference was not followed
+- **No hover flyout**: the navigation expands in place instead (D35).
+- **Formatting bar is always visible** in the composer — a selection-only toolbar is unreachable
+  on touch.
+- **Send is a labelled primary button**, close is an X button, the settings dialog closes with an
+  X (not a red dot imitating window chrome).
+- **Star stays in the list row**; the list header keeps the unread filter and sync.
+- **Reading column is capped** at `52rem` and centred (the reference has no cap at its window
+  size); the toolbar and subject share the column so they stay aligned on wide screens.
+- **Search suggestions are recent queries and a description**, not operators: the API is a plain
+  full-text prefix search. Recent queries stay in memory, never in `localStorage`.
+- **The "done" segment is labelled Archive** and exists only where the mailbox can archive.
+- **Recipients open on first focus and stay open** — collapsing them again on blur would move
+  the page under the pointer between mouse-down and mouse-up.
+- **Month headings** use the locale's standalone month name; week boundaries follow the locale
+  (Sunday in en-US, Monday in uk).
+
+## D35 — One navigation layout; the flyout is removed
+The rail and the open menu were two component trees, so opening the menu moved every icon,
+turned Compose into a wide button and reflowed the language and theme controls. They are now one
+column of rows (fixed icon cell + label) that only changes width; nothing else moves, which is
+asserted per icon in `e2e/layout.spec.ts`. Consequences:
+- The overlay flyout ("Accounts and folders") is gone. Its only content the rail lacked was the
+  account switcher and the mailbox's folders. Accounts are now rows of the column in both states
+  (colour dot as the icon); the folders are shown when expanded, because a column of identical
+  folder icons says nothing.
+- Compose is an ordinary row (no accent button) and the segmented language / theme switches left
+  the navigation (they remain in Settings → Appearance and on the sign-in pages), so the top and
+  bottom blocks have the same rows in both states. The phone drawer uses the same rows.
+- The column keeps the `--rail` surface when expanded: changing the surface would read as a
+  different panel.
+- The state lives on `<html data-nav>`, set by an inline script before first paint, instead of
+  being derived from React state after hydration, which showed the rail for a few frames.
+- `--nav-width` is a registered custom property transitioned on `:root`, so the column, the
+  panes and the composer cannot get out of step; browsers without `@property` switch instantly.
+- The language and theme rows keep their accessible names ("Switch language to …") while the
+  visible label names the current value ("Language: English"), as required for a stable name in
+  both states. This does not satisfy WCAG 2.5.3 (label in name) literally; see LIMITATIONS.
+
+## D36 — Any account colour, an optional picture, and a colour wash on message rows
+Users pick any RGB colour for a mailbox and may add a small picture; every row of the thread list
+is tinted with the mailbox colour.
+- **Colours are stored as `#rrggbb`.** The API used to accept only eight names (`blue`, …) while
+  the UI sent hex values, so saving a colour failed with 422. Migration 0002 maps the names to the
+  hex values the UI already showed and adds a check constraint.
+- **The picture lives in `email_accounts`** (a deferred `bytea` column) rather than a new table:
+  it is one small value per account, is deleted with the account, and needs no extra RLS policy.
+  It is never loaded with the account list; `avatar_updated_at` versions its URL so it can be
+  cached as immutable.
+- **No image library on the server.** The browser crops and re-encodes; the server enforces size
+  and recognises PNG / JPEG / WebP from the bytes, and serves with `nosniff` and a sandbox CSP.
+  Decoding untrusted images on the server would add attack surface for no gain in this use.
+- **The wash is a small share of the colour mixed into the surface** (OKLab `color-mix`), not
+  an opacity overlay, so text keeps its colour and contrast is predictable; the shares are theme
+  tokens. The selected row keeps the accent fill so the open conversation stays obvious.
+
+## D37 — Interface preferences on the account, applied as `<html>` attributes
+Settings → Interface lets users choose list density, preview lines, sender pictures, wash
+strength, an accent colour and the reader's text size.
+- **Stored server-side with the other settings**, not only in the browser, so they follow the
+  user to every device. They are also cached in `localStorage` (nothing sensitive) only to avoid
+  a flash of the default layout on reload, the same way the theme is.
+- **Applied as data attributes and CSS variants**, not React props: the thread row, its skeleton
+  and the preview in settings share one set of classes, and nothing between the settings query
+  and the row needs to know about them.
+- **Fixed choices, not free values.** Accents are six reviewed palettes rather than any colour,
+  so contrast can be guaranteed and tested; free-form colour stays with mailboxes (D36).
+- **Reader text size sets only the base size.** Most HTML email sets its own sizes and is shown
+  as authored; scaling it would fight the fit-to-width logic of the email frame.

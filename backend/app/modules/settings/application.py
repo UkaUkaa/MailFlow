@@ -4,7 +4,7 @@ import uuid
 from dataclasses import replace
 from typing import Protocol
 
-from app.modules.settings.domain import LOCALES, THEMES, UserSettings
+from app.modules.settings.domain import CHOICES, UserSettings
 from app.shared.domain.errors import FieldProblem, InvalidInputError
 
 
@@ -22,10 +22,13 @@ class SettingsService:
 
     async def update(self, user_id: uuid.UUID, changes: dict[str, object]) -> UserSettings:
         current = await self.get(user_id)
-        if "locale" in changes and changes["locale"] not in LOCALES:
-            raise InvalidInputError(problems=[FieldProblem("locale", "unsupported")])
-        if "theme" in changes and changes["theme"] not in THEMES:
-            raise InvalidInputError(problems=[FieldProblem("theme", "unsupported")])
+        problems = [
+            FieldProblem(field, "unsupported")
+            for field, allowed in CHOICES.items()
+            if field in changes and changes[field] not in allowed
+        ]
+        if problems:
+            raise InvalidInputError(problems=problems)
         updated = replace(current, **changes)  # type: ignore[arg-type]
         await self._repo.save(user_id, updated)
         return updated

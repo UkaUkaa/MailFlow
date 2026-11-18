@@ -21,7 +21,6 @@
     "primary": "Primary",
     "menu": "Navigation",
     "openMenu": "Open navigation",
-    "toggleSidebar": "Toggle sidebar",
     "compose": "Compose",
     "settings": "Settings",
     "search": "Search",
@@ -44,7 +43,13 @@
       "starred": "Starred",
       "search": "Search",
       "settings": "Settings"
-    }
+    },
+    "switchLanguage": "Switch language to {language}",
+    "switchTheme": "Switch theme to {theme}",
+    "pinSidebar": "Expand menu",
+    "unpinSidebar": "Collapse menu",
+    "languageRow": "Language: {language}",
+    "themeRow": "Theme: {theme}"
   },
   "accounts": {
     "title": "Connected accounts",
@@ -75,6 +80,20 @@
     "displayNameHint": "Shown in the sidebar instead of the email address.",
     "color": "Colour",
     "colorOption": "Colour {index}",
+    "colorCustom": "Custom colour",
+    "colorHex": "Hex code",
+    "colorHexInvalid": "Enter a colour such as #3355e0.",
+    "colorFromPicture": "Picked from the picture. You can change it.",
+    "picture": "Picture",
+    "pictureHint": "PNG, JPEG or WebP. Cropped to a square and shown instead of the colour dot. The colour still tints this mailbox's messages.",
+    "pictureChoose": "Choose picture",
+    "pictureReplace": "Replace picture",
+    "pictureRemove": "Remove picture",
+    "pictureUnsupported": "This file is not a PNG, JPEG or WebP image.",
+    "pictureTooLarge": "This picture is too large.",
+    "pictureFailed": "The picture could not be saved. Try again.",
+    "preview": "Preview in the message list",
+    "previewSubject": "Messages from this mailbox look like this",
     "reconnect": "Reconnect",
     "disconnect": "Disconnect",
     "actionsFor": "Actions for {account}",
@@ -174,8 +193,6 @@
     "emptyDescription": "Conversations in this folder will appear here.",
     "emptyUnreadTitle": "All caught up",
     "emptyUnreadDescription": "There are no unread conversations in this folder.",
-    "searchPromptTitle": "Search your mail",
-    "searchPromptDescription": "Find conversations by sender, subject or content.",
     "noResultsTitle": "No results",
     "noResultsDescription": "Try different keywords or check the spelling.",
     "endOfList": "End of list",
@@ -201,6 +218,16 @@
         "not_spam": "{count, plural, one {Conversation moved out of spam} other {# conversations moved out of spam}}",
         "mark_unread": "{count, plural, one {Conversation marked as unread} other {# conversations marked as unread}}"
       }
+    },
+    "noContent": "No content",
+    "newMessage": "New message",
+    "backToInbox": "Back to inbox",
+    "messageCount": "{count, plural, one {# message} other {# messages}}",
+    "groups": {
+      "today": "Today",
+      "yesterday": "Yesterday",
+      "thisWeek": "This week",
+      "lastWeek": "Last week"
     }
   },
   "reader": {
@@ -215,11 +242,11 @@
     "replyAll": "Reply all",
     "forward": "Forward",
     "draft": "Draft",
-    "editDraft": "Edit draft",
+    "editDraft": "Edit",
     "expandMessage": "Expand message from {sender}",
     "messageFrom": "Message from {sender}",
     "messageActions": "Message actions",
-    "toRecipients": "to {recipients}",
+    "toRecipients": "to <r>{recipients}</r>",
     "toggleDetails": "Show or hide details",
     "from": "From",
     "to": "To",
@@ -232,12 +259,24 @@
     "attachments": "{count, plural, one {# attachment} other {# attachments}}",
     "download": "Download",
     "fitToScreen": "Fit to screen",
-    "originalSize": "View at original size"
+    "originalSize": "View at original size",
+    "noRecipients": "No recipients yet",
+    "deleteDraft": "Delete",
+    "deleteDraftTitle": "Delete this draft?",
+    "deleteDraftDescription": "The draft is removed from the mailbox. This cannot be undone.",
+    "draftDeleted": "Draft deleted",
+    "showQuoted": "Show quoted text",
+    "hideQuoted": "Hide quoted text"
   },
   "search": {
     "label": "Search mail",
     "placeholder": "Search mail",
-    "clear": "Clear search"
+    "clear": "Clear search",
+    "close": "Close search",
+    "recent": "Recent searches",
+    "searchFor": "Search for {query}",
+    "hintTitle": "Search by words",
+    "hintDescription": "Finds synchronized conversations containing your words, or words that start with them. Search operators such as from: are not supported."
   },
   "composer": {
     "title": {
@@ -251,14 +290,12 @@
     "to": "To",
     "cc": "Cc",
     "bcc": "Bcc",
-    "ccBcc": "Cc/Bcc",
     "subject": "Subject",
     "body": "Message",
     "bodyPlaceholder": "Write your message",
     "send": "Send",
     "sendAnyway": "Send anyway",
     "close": "Save and close",
-    "minimize": "Minimize",
     "expand": "Expand",
     "attach": "Attach files",
     "attachments": "Attachments",
@@ -323,7 +360,9 @@
         "network_error": "You appear to be offline. Your message was not sent.",
         "unknown": "The message could not be sent. Please try again."
       }
-    }
+    },
+    "dock": "Dock",
+    "recipientsPlaceholder": "To, Cc, Bcc"
   },
   "auth": {
     "backToLogin": "Back to sign in",
@@ -419,6 +458,7 @@
       "profile": "Profile",
       "accounts": "Connected accounts",
       "appearance": "Appearance and language",
+      "interface": "Interface",
       "security": "Password",
       "sessions": "Sessions",
       "danger": "Delete account"
@@ -445,6 +485,64 @@
       "languageDescription": "Used for the interface and for emails MailFlow sends you.",
       "remoteImages": "Always show remote images",
       "remoteImagesDescription": "Off by default: remote images can tell senders when you open their email."
+    },
+    "interface": {
+      "title": "Interface",
+      "description": "Arrange the message list and the reader the way you like.",
+      "preview": {
+        "label": "Preview",
+        "sender1": "Olena Kovalenko",
+        "subject1": "Design review on Thursday",
+        "snippet1": "Here are the mockups for the new onboarding flow. Could you take a look before the meeting and leave your comments?",
+        "sender2": "Team updates",
+        "subject2": "Weekly summary",
+        "snippet2": "Three tasks were closed this week and two new ones are waiting for review.",
+        "time2": "Yesterday"
+      },
+      "listSection": "Message list",
+      "density": "Density",
+      "densityDescription": "Compact fits more conversations on the screen.",
+      "densities": {
+        "comfortable": "Comfortable",
+        "compact": "Compact"
+      },
+      "previewLines": "Message preview",
+      "previewLinesDescription": "How much of the latest message is shown under the subject.",
+      "previewOptions": {
+        "0": "Off",
+        "1": "1 line",
+        "2": "2 lines"
+      },
+      "avatars": "Sender pictures",
+      "avatarsDescription": "Show a coloured initial for each sender in the list.",
+      "tint": "Mailbox colour in rows",
+      "tintDescription": "How strongly each row is washed with its mailbox colour.",
+      "tints": {
+        "off": "Off",
+        "subtle": "Subtle",
+        "strong": "Strong"
+      },
+      "colorsSection": "Colours",
+      "accent": "Accent colour",
+      "accentDescription": "Used for buttons, links, selection and unread markers.",
+      "accents": {
+        "blue": "Blue",
+        "violet": "Violet",
+        "green": "Green",
+        "orange": "Orange",
+        "pink": "Pink",
+        "graphite": "Graphite"
+      },
+      "readerSection": "Reader",
+      "readerText": "Message text size",
+      "readerTextDescription": "Applies to messages that do not set their own text size.",
+      "readerTexts": {
+        "small": "Small",
+        "default": "Default",
+        "large": "Large"
+      },
+      "reset": "Reset to defaults",
+      "resetDone": "Interface settings reset"
     },
     "security": {
       "title": "Password",
@@ -487,6 +585,7 @@
         "confirmAction": "Delete permanently",
         "typeToConfirm": "Type {word} to confirm"
       }
-    }
+    },
+    "close": "Close settings"
   }
 }

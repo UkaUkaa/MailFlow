@@ -1,12 +1,19 @@
+import { avatarColor } from "@/shared/constants/account-colors";
 import { cn } from "@/shared/lib/cn";
 import { initials } from "@/shared/utils/format";
 
-export function Avatar({ name, className }: { name: string; className?: string }) {
+/**
+ * Initials on a disc. With `colorKey` (an address) the disc takes a deterministic hue from the
+ * avatar palette; without it the disc is neutral. No picture is ever fetched.
+ */
+export function Avatar({ name, colorKey, className }: { name: string; colorKey?: string; className?: string }) {
   return (
     <span
       aria-hidden
+      style={colorKey ? { backgroundColor: avatarColor(colorKey) } : undefined}
       className={cn(
-        "inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-[13px] font-semibold text-foreground-muted select-none",
+        "inline-flex size-7 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold select-none",
+        colorKey ? "text-white" : "bg-muted text-foreground-muted",
         className,
       )}
     >

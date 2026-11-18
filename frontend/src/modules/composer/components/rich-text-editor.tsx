@@ -171,7 +171,7 @@ export function useRichTextEditor({
     ],
     content: initialHtml,
     editorProps: {
-      attributes: { role: "textbox", "aria-multiline": "true", "aria-label": ariaLabel, class: "text-[15px] text-foreground" },
+      attributes: { role: "textbox", "aria-multiline": "true", "aria-label": ariaLabel, class: "text-[15px] text-foreground md:text-sm md:leading-[22px]" },
     },
     onUpdate: ({ editor }) => onChange(editor.getHTML(), editor.isEmpty),
   });

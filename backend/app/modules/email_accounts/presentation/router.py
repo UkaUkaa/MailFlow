@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Annotated, Literal
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Depends, File, Query, Response, UploadFile, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
 
@@ -18,7 +18,7 @@ from app.integrations.email_providers.contracts import (
     ProviderKind,
     ServerCredentials,
 )
-from app.modules.email_accounts.domain import EmailAccount
+from app.modules.email_accounts.domain import MAX_AVATAR_BYTES, EmailAccount
 from app.modules.synchronization.domain import SyncState
 from app.shared.domain.errors import NotFoundError
 
@@ -39,6 +39,9 @@ class AccountOut(BaseModel):
     email_address: str
     display_name: str
     color: str
+    # Set when the account has a picture; it changes whenever the picture does, so it doubles
+    # as the cache key of `GET /accounts/{id}/avatar?v=...`.
+    avatar_updated_at: datetime | None
     status: str
     status_reason: str | None
     capabilities: dict[str, bool]
@@ -171,6 +174,7 @@ def _account_out(
         email_address=account.email_address,
         display_name=account.display_name,
         color=account.color,
+        avatar_updated_at=account.avatar_updated_at,
         status=account.status.value,
         status_reason=account.status_reason,
         capabilities=_capabilities(account, svc, roles),
@@ -321,6 +325,49 @@ async def update_account(
     states = await svc.sync_requests.status(auth.user_id)
     return _account_out(
         account, states.get(account.id), svc, await _folder_roles(svc, auth.user_id)
+    )
+
+
+async def _single_account_out(account: EmailAccount, auth: Auth, svc: Svc) -> AccountOut:
+    states = await svc.sync_requests.status(auth.user_id)
+    return _account_out(
+        account, states.get(account.id), svc, await _folder_roles(svc, auth.user_id)
+    )
+
+
+@router.put(
+    "/{account_id}/avatar",
+    response_model=AccountOut,
+    dependencies=[Depends(rate_limit("account-avatar", limit=60, window_seconds=3600))],
+)
+async def upload_avatar(
+    account_id: uuid.UUID, auth: Auth, svc: Svc, file: Annotated[UploadFile, File()]
+) -> AccountOut:
+    """Set the account picture: a PNG, JPEG or WebP of at most MAX_AVATAR_BYTES."""
+    content = await file.read(MAX_AVATAR_BYTES + 1)
+    account = await svc.accounts.set_avatar(auth.user_id, account_id, content)
+    return await _single_account_out(account, auth, svc)
+
+
+@router.delete("/{account_id}/avatar", response_model=AccountOut)
+async def remove_avatar(account_id: uuid.UUID, auth: Auth, svc: Svc) -> AccountOut:
+    account = await svc.accounts.remove_avatar(auth.user_id, account_id)
+    return await _single_account_out(account, auth, svc)
+
+
+@router.get("/{account_id}/avatar")
+async def get_avatar(account_id: uuid.UUID, auth: Auth, svc: Svc) -> Response:
+    media_type, content = await svc.accounts.avatar(auth.user_id, account_id)
+    return Response(
+        content=content,
+        # The type was recognised from the bytes at upload; the browser must not guess another.
+        media_type=media_type,
+        headers={
+            "X-Content-Type-Options": "nosniff",
+            "Content-Security-Policy": "sandbox; default-src 'none'",
+            # The URL carries the picture's version, so a cached copy is never stale.
+            "Cache-Control": "private, max-age=31536000, immutable",
+        },
     )
 
 

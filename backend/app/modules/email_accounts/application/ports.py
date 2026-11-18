@@ -31,6 +31,18 @@ class AccountRepository(Protocol):
         display_name: str | None = None,
         color: str | None = None,
     ) -> None: ...
+    async def set_avatar(
+        self,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+        avatar: tuple[str, bytes] | None,
+        now: datetime,
+    ) -> None:
+        """Store ``(media type, bytes)`` as the account picture, or remove it with ``None``."""
+
+    async def get_avatar(
+        self, user_id: uuid.UUID, account_id: uuid.UUID
+    ) -> tuple[str, bytes] | None: ...
     async def set_status(
         self, user_id: uuid.UUID, account_id: uuid.UUID, status: AccountStatus, reason: str | None
     ) -> None: ...

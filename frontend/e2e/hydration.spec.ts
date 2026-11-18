@@ -56,6 +56,25 @@ for (const size of SIZES) {
     });
   }
 
+  test(`mail page hydrates cleanly with the sidebar pinned open (${size.name})`, async ({ page }) => {
+    await page.setViewportSize(size);
+    const errors = collectReactErrors(page);
+    await mockApi(page);
+    await deliverBuffered(page);
+    // The server renders the collapsed column; an inline script widens it before first paint.
+    await page.addInitScript(() => window.localStorage.setItem("mf-sidebar", "false"));
+    for (const path of ["mail/inbox", "settings/accounts"]) {
+      await page.goto(`/en/${path}`);
+      await expect(page.locator("h1").locator("visible=true").first()).toBeVisible();
+      await page.waitForTimeout(500);
+    }
+    if (size.name === "desktop") {
+      await expect(page.locator("aside.mf-sidebar")).toHaveAttribute("data-pinned", "true");
+      expect((await page.locator("aside.mf-sidebar").boundingBox())?.width).toBe(240);
+    }
+    expect(errors).toEqual([]);
+  });
+
   test(`signed-out pages hydrate cleanly (${size.name})`, async ({ page }) => {
     await page.setViewportSize(size);
     const errors = collectReactErrors(page);

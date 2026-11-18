@@ -237,7 +237,9 @@ class Services:
 
     @cached_property
     def accounts(self) -> AccountService:
-        return AccountService(self.account_repository, self.vault, self._rt.registry, self.audit)
+        return AccountService(
+            self.account_repository, self.vault, self._rt.registry, self.audit, self._rt.clock
+        )
 
     @cached_property
     def connect_accounts(self) -> ConnectAccountService:

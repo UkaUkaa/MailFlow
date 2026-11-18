@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import fields
 from datetime import datetime
 
-from sqlalchemy import Boolean, ForeignKey, String, select
+from sqlalchemy import Boolean, ForeignKey, SmallInteger, String, select, text
 from sqlalchemy.dialects.postgresql import UUID, insert
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
@@ -22,7 +23,29 @@ class UserSettingsModel(Base):
     theme: Mapped[str] = mapped_column(String(16), nullable=False, default="system")
     load_remote_images: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     conversation_view: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Interface preferences (migration 0003). Server defaults fill rows written before them.
+    list_density: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="comfortable", server_default="comfortable"
+    )
+    list_preview_lines: Mapped[int] = mapped_column(
+        SmallInteger, nullable=False, default=1, server_default=text("1")
+    )
+    show_avatars: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
+    account_tint: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="subtle", server_default="subtle"
+    )
+    accent_color: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="blue", server_default="blue"
+    )
+    reader_text_size: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="default", server_default="default"
+    )
     updated_at: Mapped[datetime] = updated_at_column()
+
+
+_FIELDS = tuple(field.name for field in fields(UserSettings))
 
 
 class SqlSettingsRepository:
@@ -35,19 +58,9 @@ class SqlSettingsRepository:
         )
         if row is None:
             return None
-        return UserSettings(
-            locale=row.locale,
-            theme=row.theme,
-            load_remote_images=row.load_remote_images,
-            conversation_view=row.conversation_view,
-        )
+        return UserSettings(**{field: getattr(row, field) for field in _FIELDS})
 
     async def save(self, user_id: uuid.UUID, settings: UserSettings) -> None:
-        values = {
-            "locale": settings.locale,
-            "theme": settings.theme,
-            "load_remote_images": settings.load_remote_images,
-            "conversation_view": settings.conversation_view,
-        }
+        values = {field: getattr(settings, field) for field in _FIELDS}
         stmt = insert(UserSettingsModel).values(user_id=user_id, **values)
         await self._db.execute(stmt.on_conflict_do_update(index_elements=["user_id"], set_=values))

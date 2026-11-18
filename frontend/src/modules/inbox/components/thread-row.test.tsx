@@ -26,12 +26,12 @@ const thread: ThreadSummary = {
   last_message_at: "2026-11-17T09:00:00Z",
 };
 
-function renderRow(canArchive: boolean, view = "inbox") {
+function renderRow(canArchive: boolean, view = "inbox", overrides: Partial<ThreadSummary> = {}) {
   const onAction = vi.fn();
   renderWithProviders(
     <ul>
       <ThreadRow
-        thread={thread}
+        thread={{ ...thread, ...overrides }}
         href="/mail/inbox/t1"
         selected={false}
         view={view}
@@ -63,5 +63,41 @@ describe("ThreadRow quick actions", () => {
   it("still leaves Archive out of the views that never had it", () => {
     renderRow(true, "archive");
     expect(screen.queryByRole("button", { name: "Archive" })).not.toBeInTheDocument();
+  });
+
+  it("can be reached with the keyboard: the row, its star, then the quick actions in order", async () => {
+    const onAction = renderRow(true);
+    const user = userEvent.setup();
+    await user.tab();
+    expect(screen.getByRole("link")).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Star" })).toHaveFocus();
+    for (const name of ["Mark as unread", "Archive", "Move to trash"]) {
+      await user.tab();
+      expect(screen.getByRole("button", { name })).toHaveFocus();
+    }
+    await user.keyboard("{Enter}");
+    expect(onAction).toHaveBeenCalledWith("trash", "t1");
+  });
+
+  it("offers Mark as read for an unread conversation and runs it", async () => {
+    const onAction = renderRow(true, "inbox", { is_unread: true });
+    expect(screen.getByText("Unread")).toBeInTheDocument();
+    await userEvent.setup().click(screen.getByRole("button", { name: "Mark as read" }));
+    expect(onAction).toHaveBeenCalledWith("mark_read", "t1");
+  });
+});
+
+describe("ThreadRow content", () => {
+  it("shows the message count as a chip with a spoken label, and the attachment mark", () => {
+    renderRow(true, "inbox", { message_count: 4, has_attachments: true });
+    expect(screen.getByText("4 messages")).toBeInTheDocument();
+    expect(screen.getByLabelText("Has attachments")).toBeInTheDocument();
+  });
+
+  it("uses placeholders for a draft without subject or content", () => {
+    renderRow(true, "drafts", { subject: "", snippet: "" });
+    expect(screen.getByText("(no subject)")).toBeInTheDocument();
+    expect(screen.getByText("No content")).toBeInTheDocument();
   });
 });

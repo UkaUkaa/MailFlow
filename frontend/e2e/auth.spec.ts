@@ -134,7 +134,8 @@ test.describe("language and theme", () => {
     await page.getByRole("button", { name: "Dark" }).click();
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     const dark = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-    expect(dark).toBe("rgb(12, 13, 15)");
+    // --background of the dark theme (DESIGN_SYSTEM.md).
+    expect(dark).toBe("rgb(23, 24, 28)");
 
     await page.reload();
     // Set by the inline script before hydration.

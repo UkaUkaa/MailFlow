@@ -3,75 +3,167 @@
 Original identity: quiet, typographic, neutral surfaces with a single ink-blue accent. No
 gradients, no emoji, minimal shadow, restrained motion.
 
+Layout, density and behaviour follow `docs/design/SPARK_REFERENCE.md`; the palette, tokens, brand
+mark and icons are MailFlow's own (see `docs/DECISIONS.md` D31).
+
 Tokens live in `frontend/src/app/globals.css` as CSS variables and are exposed to Tailwind through
 `@theme`. Components use semantic tokens only — never raw hex values.
+
+## Surfaces: three tonal steps
+
+Panes are separated by tone, not by divider lines.
+
+| Step | Token | Where |
+|---|---|---|
+| Deepest | `--rail` | Navigation column, collapsed and expanded |
+| Base | `--background` | Reading pane, composer page, settings navigation column, auth pages |
+| Raised | `--surface` | List pane, phone drawer |
+| Raised (floating) | `--surface-raised` | Message cards, dialogs, sheets, docked reply, menus, inputs |
+
+In the dark theme each step is lighter than the previous one. In the light theme the roles are
+the same and the direction is the natural one for light UIs: the rail is the most tinted grey,
+the reading pane a faint grey, the list pane and cards white.
 
 ## Colour tokens
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
-| `--background` | `#ffffff` | `#0c0d0f` | App canvas, reader |
-| `--surface` | `#f7f7f8` | `#121316` | Sidebar, list pane |
-| `--surface-raised` | `#ffffff` | `#191b1f` | Cards, dialogs, sheets |
-| `--muted` | `#f0f0f2` | `#1e2025` | Hover, chips, skeletons |
-| `--border` | `#e6e6ea` | `#26282e` | Hairlines |
-| `--border-strong` | `#d2d2d9` | `#363941` | Inputs |
+| `--rail` | `#e9e9ee` | `#0a0b0d` | Navigation column |
+| `--background` | `#f5f5f7` | `#17181c` | App canvas, reading pane, composer |
+| `--surface` | `#ffffff` | `#202227` | List pane, sidebar, drawer |
+| `--surface-raised` | `#ffffff` | `#24262c` | Cards, dialogs, sheets, docked reply |
+| `--muted` | `#ececf0` | `#2c2f36` | Hover, chips, skeletons, notes |
+| `--border` | `#e2e2e8` | `#30333b` | Hairlines, card borders |
+| `--border-strong` | `#cfcfd8` | `#444852` | Inputs, pills, square buttons, the empty-pane glyph |
 | `--foreground` | `#17181c` | `#ededf0` | Primary text |
-| `--foreground-muted` | `#5d5f6b` | `#a0a3ad` | Secondary text |
-| `--foreground-subtle` | `#8a8c98` | `#737682` | Tertiary text, placeholders |
-| `--accent` | `#3355e0` | `#7d95ff` | Primary action, unread marker, focus |
-| `--accent-foreground` | `#ffffff` | `#0c0d0f` | Text on accent |
-| `--accent-soft` | `#eef1fd` | `#1a2040` | Selected row, soft buttons |
-| `--danger` | `#c93a3a` | `#f07070` | Destructive |
-| `--success` | `#1f8a4c` | `#4cc38a` | Success |
-| `--warning` | `#a86a00` | `#e0a83a` | Attention |
+| `--foreground-muted` | `#5d5f6b` | `#adb0ba` | Secondary text, icons |
+| `--foreground-subtle` | `#686a77` | `#9497a3` | Tertiary text, placeholders, dates, group labels |
+| `--accent` | `#3355e0` | `#8098ff` | Primary action, active rail item, unread dot, links, focus |
+| `--accent-hover` | `#2947c7` | `#96aaff` | Hover of accent fills |
+| `--accent-foreground` | `#ffffff` | `#0c0d0f` | Text and glyphs on accent |
+| `--accent-soft` | `#e6ebfd` | `#27315e` | Accent tint: selected row, active settings row, profile card, soft buttons |
+| `--danger` | `#c43535` | `#f27878` | Destructive |
+| `--success` | `#197a42` | `#4cc38a` | Success |
+| `--warning` | `#8f5a00` | `#e0a83a` | Attention |
 
-Text/background pairs meet WCAG AA (4.5:1 body, 3:1 large/UI).
+### Contrast (WCAG 2.1 AA), measured
 
-Account colours (identification dots): a fixed set of eight hues, chosen per account.
+| Pair | Light | Dark |
+|---|---|---|
+| `--foreground` on rail / background / surface / raised | 14.7 / 16.3 / 17.7 / 17.7 | 16.9 / 15.2 / 13.6 / 12.9 |
+| `--foreground-muted` on rail / background / surface / raised / muted / accent-soft | 5.2 / 5.8 / 6.3 / 6.3 / 5.4 / 5.3 | 9.1 / 8.2 / 7.4 / 7.0 / 6.2 / 5.8 |
+| `--foreground-subtle` on background / surface / raised | 4.9 / 5.4 / 5.4 | 6.1 / 5.5 / 5.2 |
+| `--accent` on background / surface / raised / accent-soft | 5.5 / 6.0 / 6.0 / 5.0 | 6.6 / 6.0 / 5.7 / 4.7 |
+| `--accent-foreground` on `--accent` | 6.0 | 7.3 |
+| `--danger` on background / surface | 4.9 / 5.4 | 6.5 / 5.9 |
+| `--success`, `--warning` on background | 4.9 / 5.3 | 8.0 / 8.3 |
+
+Rules that follow from the numbers:
+
+- `--foreground-subtle` is for text on background, surface and raised surfaces only. On
+  `--accent-soft` and `--muted` it drops to 4.3–4.6:1, so text on a selected row or a chip uses
+  `--foreground-muted` (the list row switches its date colour when selected).
+- The empty-pane glyph and the rail's hover fill are decoration and are exempt.
+- Text on `--rail` (row labels, section headings) uses `--foreground-muted` or stronger;
+  `--foreground-subtle` would be 4.4:1 there in the light theme.
+
+Account colours: any `#rrggbb` per account, picked from eight preset hues
+(`shared/constants/account-colors.ts`), the platform's RGB picker or a typed hex code. A mailbox
+may also have a picture, shown instead of the dot (16px in lists, 36px in settings).
+
+Message-row wash (`.account-tint` in `globals.css`): each row in the thread list mixes the
+mailbox colour into `--surface` — 7% at rest and 12% on hover in the light theme, 10% / 14% in
+the dark theme (`--account-tint-rest`, `--account-tint-hover`), in OKLab so hues look equally
+strong. Neighbouring rows are separated by a 1px line of plain surface; the selected row keeps
+`--accent-soft`. Dates on a tinted row use `--foreground-muted`, which stays at or above 4.5:1
+on the strongest wash for the presets and for pure white, black, yellow, red and cyan in both
+themes (unit-tested). Avatar discs use the same hues 15% darker
+(`AVATAR_COLORS`), picked deterministically from the sender's address; white initials reach at
+least 5.1:1 on every one (unit-tested). No avatar picture is ever fetched.
+
+Interface preferences (Settings → Interface) restyle the app through `<html>` data attributes
+set by `shared/lib/interface-preferences.ts`:
+- `data-accent` swaps `--accent`, `--accent-hover` and `--accent-soft` for one of six palettes
+  per theme (blue is the default). Every palette keeps `--accent-foreground` on the accent and the
+  accent on `--accent-soft`, `--surface` and `--background` at 4.5:1 or more (unit-tested against
+  `globals.css`). An element can carry `data-accent` itself (the swatches do).
+- `data-tint` = `off` removes the row wash; `strong` raises it to 10% / 14% (light) and 13% / 15%
+  (dark), the most the muted-text contrast rule above allows.
+- `data-density`, `data-preview`, `data-avatars` drive the Tailwind variants `compact:`,
+  `preview-none:`, `preview-two:` and `no-avatars:` used by the thread row and its skeleton.
 
 ## Typography
 
 Font: Inter (variable, self-hosted via `next/font`) with system fallbacks; it covers Cyrillic.
-Monospace: `ui-monospace` stack.
+Monospace: `ui-monospace` stack. Weights in the mail workspace: regular, medium and semibold.
 
-| Token | Size / line height | Use |
-|---|---|---|
-| `text-xs` | 12 / 16 | Meta, timestamps |
-| `text-sm` | 14 / 20 | Dense UI, list rows (desktop) |
-| `text-base` | 16 / 24 | Body, inputs on phones, reader |
-| `text-lg` | 18 / 26 | Section titles |
-| `text-xl` | 20 / 28 | Page titles (phone) |
-| `text-2xl` | 24 / 32 | Page titles (desktop), auth headings |
+| Size / line height | Use |
+|---|---|
+| 11 / 16 | Row dates, count chips, list-header subtitle, key chips, the `DRAFT` tag |
+| 12 / 16 | Meta: timestamps, "to …" line, settings descriptions, search hint |
+| 13 / 18 | Row subject and preview, date-group labels, notes |
+| 14 / 20–22 | Primary UI: senders, titles, navigation rows, message body, docked subject |
+| 15 / 20 | Settings section title; phone list title is 16 |
+| 16 / 24 | Inputs on phones (prevents iOS zoom), phone reader subject |
+| 22 / 28 | Composer subject on tablet and wider (18 on phones) |
+| 24 / 32 | Auth headings |
 
-List rows use 15px on phones (comfortable reading) and 14px from `md`. Nothing is below 12px.
+11px is the floor and is reserved for the short, non-essential labels listed above.
 
 ## Spacing, radius, elevation
 
-- Spacing: Tailwind 4px scale. Page gutters `16px` phone, `24px` tablet, `32px` desktop.
-- Radius: `--radius-sm` 6px (chips), `--radius-md` 8px (inputs, buttons), `--radius-lg` 12px
-  (cards, dialogs), `--radius-xl` 16px (sheets).
-- Shadow: `--shadow-sm` for popovers, `--shadow-lg` for dialogs/composer. Nothing else is shadowed.
+- Spacing: Tailwind 4px scale. The mail workspace is dense: 12px pane inset, 20px card padding
+  (16 on phones), 20px between cards.
+- Radius: `--radius-sm` 6px (chips, navigation rows, search field, square buttons), 7px (rail
+  buttons), `--radius-md` 8px (inputs, buttons), `--radius-lg` 12px (message cards, dialogs,
+  docked reply, settings dialog), `--radius-xl` 16px (sheets), full (toolbar pill, avatars).
+- Shadow: `--shadow-sm` for popovers, `--shadow-lg` for dialogs and the docked reply.
+  Nothing else is shadowed.
 
 ## Component sizes
 
-| Control | Desktop | Coarse pointer |
+| Component | Desktop | Coarse pointer / phone |
 |---|---|---|
+| Navigation column | 70px collapsed, 240px expanded; rows 28px high at 31px pitch with 21px side margins; icon cell 28×28 with a 20px glyph, centred at x = 35 in both states; label 14px after the cell | rows and icon cells 44px, 13px side margins (centre still at 35) |
+| List pane | 348px (400 from 1920); header 76px | full width; header 56px |
+| Thread row | 88px, three lines; gutter 30, avatar 28, text from 62 | same; star target 44 |
+| Date-group label | 13px, 24px above / 12px below | same |
+| Reader toolbar | 56px; pill 32px high, segments 36 wide; icon buttons 32 at 40 pitch | pill and buttons 44 |
+| Message card | radius 12, 1px border, padding 20, 20px apart | padding 16, 12px apart |
+| Reading column | `max-w-[52rem]` with 12px inset (frame ≤ 768px) | full width, 12px inset |
+| Composer page | content from 78px, 640px wide; subject 22px | full screen; subject 18px |
+| Docked reply | 520×380, radius 12, 12px from the pane edges | not used below 1024px |
+| Search field | 36px, radius 6, 2px accent border on focus; suggestion rows 42px | 44px |
+| Settings dialog | ≤ 870×700, radius 12; navigation 270px (240 below 1024), rows 31px | full pages; rows 48px |
 | Button / input height | 36px | 44px |
 | Icon button | 32px | 44px |
-| List row min height | 64px | 76px |
 | Bottom nav | — | 56px + safe area |
 
 The coarse-pointer sizes are applied with `@media (pointer: coarse)` through the `touch:` variant.
 
 ## States
 
-- Focus: 2px `--accent` ring with 2px offset, `:focus-visible` only.
+- Hover: one tonal step (`--muted`), no border change. Thread rows also swap the unread dot and
+  avatar for the quick-action column.
+- Active / selected: solid `--accent` for the open view (the row: a 28px square when collapsed, a pill when expanded); `--accent-soft`
+  for rows (selected thread, active settings row, active account).
+- Focus: 2px `--accent` ring with 2px offset, `:focus-visible` only; the search field shows a 2px
+  accent border instead.
 - Disabled: 50% opacity, `not-allowed` cursor, no hover.
 - Loading: skeletons matching final layout (no layout shift); buttons show a spinner and keep width.
 - Error: `--danger` text + icon, never colour alone. Success: toast with `--success` icon.
-- Motion: 120–200ms ease-out; respects `prefers-reduced-motion`.
+- Motion: 120–200ms ease-out (docked reply 140ms; navigation column width 180ms with labels fading over 150ms); respects `prefers-reduced-motion`.
+
+## Tooltips
+
+Every icon-only control has an accessible name and a tooltip with the same text (`Tooltip`).
+Where a control's label can become visible (the navigation column when expanded) the tooltip is
+switched off with `disabled`, which keeps the element tree and therefore the focus.
+A key chip (`shortcut` prop) is shown only for shortcuts that exist: Esc (close composer, close
+settings) and Ctrl/⌘ Enter (send). There is no global shortcut layer, so navigation icons carry
+no key hints.
 
 ## Iconography
 
-Lucide, 16px in dense desktop UI, 20px in navigation and on touch. Stroke width 1.75.
+Lucide only. 20px in the rail and on touch, 16px in dense desktop UI, 14px for row quick actions.
+Stroke width 1.75. The empty reading pane is one 112px glyph at stroke 1 in `--border-strong`.
