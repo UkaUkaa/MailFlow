@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- AI pull-request review (`.github/workflows/ai-pr-review.yml`): on every non-draft PR an AI
+  agent (Claude Sonnet 5.5 via `anthropics/claude-code-action`) scores the code 1-10, writes a short code
+  review in Russian and lists recommendations only when they matter. One comment per PR,
+  updated on each push. Needs the `ANTHROPIC_API_KEY` repository secret; fork PRs are skipped.
 - Real delivery of verification and password reset emails. `SMTP_TLS` adds implicit TLS
   (port 465) next to `SMTP_STARTTLS`; messages carry `Date`, `Message-ID` and
   `Auto-Submitted` headers so receiving servers accept them. Production refuses to start
