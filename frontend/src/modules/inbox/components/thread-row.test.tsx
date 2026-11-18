@@ -101,3 +101,43 @@ describe("ThreadRow content", () => {
     expect(screen.getByText("No content")).toBeInTheDocument();
   });
 });
+
+describe("ThreadRow selection mode", () => {
+  function renderSelectable(checked: boolean) {
+    const onToggleSelect = vi.fn();
+    renderWithProviders(
+      <ul>
+        <ThreadRow
+          thread={thread}
+          href="/mail/inbox/t1"
+          selected={false}
+          view="inbox"
+          accountColor={null}
+          showAccount={false}
+          canArchive
+          onAction={vi.fn()}
+          selectionMode
+          checked={checked}
+          onToggleSelect={onToggleSelect}
+        />
+      </ul>,
+    );
+    return onToggleSelect;
+  }
+
+  it("turns the row into a checkbox that toggles instead of opening the conversation", async () => {
+    const onToggleSelect = renderSelectable(false);
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
+    const box = screen.getByRole("checkbox");
+    expect(box).toHaveAttribute("aria-checked", "false");
+    await userEvent.setup().click(box);
+    expect(onToggleSelect).toHaveBeenCalledWith("t1");
+  });
+
+  it("hides the per-row actions while selecting", () => {
+    renderSelectable(true);
+    expect(screen.getByRole("checkbox")).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByRole("button", { name: "Star" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Move to trash" })).not.toBeInTheDocument();
+  });
+});

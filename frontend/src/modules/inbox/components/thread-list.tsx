@@ -1,12 +1,19 @@
 "use client";
 
-import { ArrowLeft, Filter, Inbox, Menu, Search as SearchIcon, SearchX, SquarePen } from "lucide-react";
+import { ArrowLeft, Filter, Inbox, ListChecks, Menu, Search as SearchIcon, SearchX, SquarePen } from "lucide-react";
 import { useParams, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ConnectAccountPrompt, SyncButton, accountAvatarUrl, accountLabel, useAccounts } from "@/modules/accounts";
 import { useComposer } from "@/modules/composer";
-import { isActionAvailable, useThreadActions, useThreadList, type ThreadAction, type ThreadListFilter } from "@/modules/emails";
+import {
+  isActionAvailable,
+  staysInView,
+  useThreadActions,
+  useThreadList,
+  type ThreadAction,
+  type ThreadListFilter,
+} from "@/modules/emails";
 import { parseMailView, useFolders } from "@/modules/folders";
 import { SearchBox, SearchSuggestions, searchHref } from "@/modules/search";
 import { Link } from "@/infrastructure/i18n/navigation";
@@ -20,6 +27,9 @@ import { Tooltip } from "@/shared/components/ui/tooltip";
 import { cn } from "@/shared/lib/cn";
 import { lastMailList, mailListHref, type MailListScope } from "@/shared/lib/mail-location";
 import { dateGroup, firstDayOfWeek, formatMonthGroup, type DateGroup } from "@/shared/utils/date-groups";
+import { useThreadSelection } from "../hooks/use-thread-selection";
+import { bulkActions } from "../lib/bulk-actions";
+import { SelectionBar } from "./selection-bar";
 import { ThreadRow } from "./thread-row";
 
 function ListSkeleton() {
@@ -89,6 +99,28 @@ export function ThreadList({ scope }: { scope?: MailListScope }) {
   const onAction = useCallback((action: ThreadAction, threadId: string) => run(action, [threadId]), [run]);
 
   const threads = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data]);
+
+  // Multi-selection: entered from the header ("Select") or by a long press on a row (touch).
+  const selection = useThreadSelection(threads, JSON.stringify(filter));
+  const { start: startSelection, stop: stopSelection, toggle: toggleSelection } = selection;
+  const selectionActions = useMemo(
+    () => bulkActions(filter.view, selection.selected, accounts.data),
+    [filter.view, selection.selected, accounts.data],
+  );
+  const onBulkAction = (action: ThreadAction) => {
+    run(action, selection.selected.map((thread) => thread.id));
+    // Conversations that leave the view end the selection; read and star changes keep it, so
+    // a further action can follow.
+    if (!staysInView(action, filter.view) || (filter.unreadOnly && action === "mark_read")) stopSelection();
+  };
+  useEffect(() => {
+    if (!selection.active) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) stopSelection();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selection.active, stopSelection]);
   const appearanceByAccount = useMemo(
     () =>
       new Map(
@@ -142,10 +174,27 @@ export function ThreadList({ scope }: { scope?: MailListScope }) {
     </Button>
   );
 
+  const selectButton = (
+    <Tooltip label={t("selection.start")}>
+      <Button variant="ghost" size="icon" aria-label={t("selection.start")} onClick={() => startSelection()}>
+        <ListChecks />
+      </Button>
+    </Tooltip>
+  );
+
   return (
     <Pane className="h-full w-full bg-surface">
       <header className="shrink-0 pt-safe">
-        {isSearch ? (
+        {selection.active ? (
+          <SelectionBar
+            count={selection.selected.length}
+            allSelected={selection.allSelected}
+            actions={selectionActions}
+            onAction={onBulkAction}
+            onToggleAll={selection.toggleAll}
+            onCancel={stopSelection}
+          />
+        ) : isSearch ? (
           <div className="flex min-h-14 min-w-0 items-center gap-2 px-2 py-2 md:min-h-[76px] md:px-3">
             {menuButton}
             <Tooltip label={ts("close")}>
@@ -155,6 +204,7 @@ export function ThreadList({ scope }: { scope?: MailListScope }) {
             </Tooltip>
             <h1 className="sr-only">{title}</h1>
             <SearchBox autoFocus={!queryText} className="flex-1" />
+            {threads.length > 0 && !searchPending ? selectButton : null}
           </div>
         ) : (
           <div className="flex min-h-14 min-w-0 items-center gap-1 pr-2 pl-2 md:min-h-[76px] md:pr-3 md:pl-5">
@@ -182,6 +232,7 @@ export function ThreadList({ scope }: { scope?: MailListScope }) {
                 <Filter />
               </Button>
             </Tooltip>
+            {threads.length > 0 && !scope ? selectButton : null}
             {hasAccounts ? <SyncButton accountId={accountId} /> : null}
             {/* Phones reach search and compose from the bottom navigation. */}
             <Tooltip label={tn("search")}>
@@ -247,6 +298,10 @@ export function ThreadList({ scope }: { scope?: MailListScope }) {
                     showAccount={!accountId && (accounts.data?.length ?? 0) > 1}
                     canArchive={isActionAvailable("archive", accounts.data, [thread.account_id])}
                     onAction={onAction}
+                    selectionMode={selection.active}
+                    checked={selection.ids.has(thread.id)}
+                    onToggleSelect={toggleSelection}
+                    onLongPress={scope ? undefined : startSelection}
                   />
                 </Fragment>
               );

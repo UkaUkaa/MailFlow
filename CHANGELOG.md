@@ -3,6 +3,12 @@
 ## [Unreleased]
 
 ### Added
+- Bulk selection in the conversation list: "Select conversations" in the list header (and a
+  long press on a row on touch screens) turns rows into checkboxes; a toolbar applies mark
+  read/unread, archive or move to inbox, move to trash or restore, spam / not spam and star /
+  unstar to the whole selection through `POST /threads/actions` (split into requests of 100).
+  "Select all" covers the loaded conversations; Escape or the close button leaves. Archive and
+  spam are offered only when every selected mailbox supports them. Moves show an undo toast.
 - Settings → Interface: message-list density (comfortable / compact), preview lines (off / 1 / 2),
   sender pictures on/off, mailbox colour wash (off / subtle / strong), app accent colour (blue,
   violet, green, orange, pink, graphite) and the reader's base text size, with a live preview

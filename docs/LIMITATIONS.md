@@ -105,7 +105,11 @@ Honest list of what is missing or partial. Update whenever something here change
   exercised against a live mailbox because no Google credentials were available.
 - Virtual-keyboard and safe-area behaviour is verified by viewport emulation only; real iOS and
   Android devices still need a manual pass.
-- No bulk selection, swipe gestures or keyboard-shortcut layer yet.
+- No swipe gestures or keyboard-shortcut layer yet.
+- Bulk "Select all" covers only the conversations loaded so far, not every match on the server.
+  Long-press selection on touch is not covered by e2e (Playwright has no touch-hold gesture).
+- There is no permanent delete: bulk "delete" moves conversations to trash (and back with
+  Restore); emptying the trash is left to the provider.
 - A reopened draft loads its quoted text in simplified form.
 - The `conversation_view` setting is stored but has no UI.
 

@@ -60,7 +60,11 @@ export function useThread(threadId: string | null) {
   });
 }
 
-type ListSnapshot = [readonly unknown[], InfiniteData<Page<ThreadSummary>> | undefined][];
+/** Matches `BulkActionRequest.thread_ids` (max_length) on the server. */
+const BULK_LIMIT = 100;
+const bulkResponseSchema = z.object({ updated: z.array(z.string()) });
+
+type ListSnapshot =[readonly unknown[], InfiniteData<Page<ThreadSummary>> | undefined][];
 
 interface ActionVariables {
   threadIds: string[];
@@ -78,10 +82,16 @@ export function useThreadAction() {
       if (threadIds.length === 1) {
         await api.post(`/threads/${encodeURIComponent(threadIds[0] ?? "")}/actions`, threadSummarySchema, { action });
       } else {
-        await api.post("/threads/actions", z.object({ updated: z.array(z.string()) }), {
-          thread_ids: threadIds,
-          action,
-        });
+        // The bulk endpoint takes at most BULK_LIMIT ids; "select all" after scrolling can exceed it.
+        const chunks: string[][] = [];
+        for (let start = 0; start < threadIds.length; start += BULK_LIMIT) {
+          chunks.push(threadIds.slice(start, start + BULK_LIMIT));
+        }
+        await Promise.all(
+          chunks.map((thread_ids) =>
+            api.post("/threads/actions", bulkResponseSchema, { thread_ids, action }),
+          ),
+        );
       }
     },
     onMutate: async ({ threadIds, action }) => {
