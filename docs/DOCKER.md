@@ -41,7 +41,8 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 Requirements:
 
 - `ENVIRONMENT=production`, `APP_BASE_URL=https://your.domain`, `ALLOWED_HOSTS=["your.domain"]`.
-  The backend refuses to start in production without an https base URL and vault keys.
+  The backend refuses to start in production without an https base URL, vault keys and a real
+  encrypted SMTP server (`SMTP_HOST` not empty/`mailpit`/loopback; `SMTP_STARTTLS` or `SMTP_TLS`).
 - TLS certificate and key at `infra/nginx/certs/fullchain.pem` and `privkey.pem`
   (for example from certbot); Nginx listens on 443 and redirects 80.
 - Real SMTP settings (`SMTP_HOST`, …); Mailpit is disabled by the override.
@@ -63,12 +64,12 @@ Requirements:
 | `REDIS_PASSWORD` | yes | — | |
 | `VAULT_KEYS` | yes | — | `key_id:base64(32 bytes)` pairs, comma separated |
 | `VAULT_PRIMARY_KEY_ID` | no | first key | Key used for new encryption |
-| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | empty | Enables Gmail |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | no | empty | Enables Gmail and "Sign in with Google". Register both redirect URIs: `{APP_BASE_URL}/api/v1/accounts/oauth/gmail/callback` and `{APP_BASE_URL}/api/v1/auth/oauth/google/callback` |
 | `GOOGLE_REDIRECT_URI` | no | derived | Override of the OAuth redirect URI |
 | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` | no | empty | Enables Outlook / Microsoft 365 (Microsoft Graph) |
 | `MICROSOFT_TENANT` | no | `common` | `common` (work, school and personal accounts), `organizations`, `consumers` or a tenant id |
 | `MICROSOFT_REDIRECT_URI` | no | derived | Override of the OAuth redirect URI (`{APP_BASE_URL}/api/v1/accounts/oauth/outlook/callback`) |
-| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `MAIL_FROM` | prod | Mailpit | System mail |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_STARTTLS`, `SMTP_TLS`, `MAIL_FROM` | prod | Mailpit | System mail |
 | `REQUIRE_EMAIL_VERIFICATION` | no | `true` | |
 | `SESSION_TTL_HOURS`, `SESSION_IDLE_TIMEOUT_HOURS` | no | 336 / 168 | |
 | `SYNC_INTERVAL_SECONDS`, `SYNC_BACKFILL_MAX_MESSAGES`, `CELERY_CONCURRENCY` | no | 120 / 5000 / 4 | |

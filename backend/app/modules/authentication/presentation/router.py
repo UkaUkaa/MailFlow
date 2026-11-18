@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import uuid
 from typing import Annotated
+from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi.responses import RedirectResponse
 
 from app.core.config import Settings
 from app.core.dependencies import DbSession, SettingsDep, client_ip, rate_limit, user_agent
@@ -15,13 +17,14 @@ from app.modules.authentication.application.services import (
 from app.modules.authentication.presentation import schemas as s
 from app.modules.authentication.presentation.dependencies import (
     Auth,
+    GoogleSignInDep,
     SessionServiceDep,
     get_password_service,
     get_registration_service,
 )
 from app.modules.users.domain import User
 from app.modules.users.infrastructure import SqlUserRepository  # composition: read model for /me
-from app.shared.domain.errors import UnauthenticatedError
+from app.shared.domain.errors import ProviderNotConfiguredError, UnauthenticatedError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -212,3 +215,90 @@ async def revoke_other_sessions(auth: Auth, sessions: SessionServiceDep) -> None
 @router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def revoke_session(session_id: uuid.UUID, auth: Auth, sessions: SessionServiceDep) -> None:
     await sessions.revoke(auth.user_id, session_id)
+
+
+# --- Sign in with Google (MailFlow authentication; grants no mailbox access) -----------------
+
+SIGN_IN_STATE_COOKIE = "mf_signin_state"
+SIGN_IN_COOKIE_PATH = "/api/v1/auth/oauth/"
+
+
+@router.get("/providers", response_model=s.SignInProviders)
+async def sign_in_providers(google: GoogleSignInDep) -> s.SignInProviders:
+    return s.SignInProviders(google=google.configured)
+
+
+def _login_redirect(settings: Settings, locale: str, error: str) -> RedirectResponse:
+    # Built from server configuration only — never from request input.
+    query = urlencode({"oauth_error": error})
+    return RedirectResponse(
+        f"{settings.app_base_url}/{locale}/login?{query}", status_code=status.HTTP_302_FOUND
+    )
+
+
+@router.get(
+    "/oauth/google/start",
+    include_in_schema=False,
+    dependencies=[Depends(rate_limit("signin-start", limit=30, window_seconds=900))],
+)
+async def google_sign_in_start(
+    settings: SettingsDep,
+    google: GoogleSignInDep,
+    locale: Annotated[str | None, Query(max_length=5)] = None,
+    next: Annotated[str | None, Query(max_length=512)] = None,
+) -> RedirectResponse:
+    """Top-level navigation from the sign-in page to Google's consent screen."""
+    try:
+        started = await google.start(locale=locale, next_path=next)
+    except ProviderNotConfiguredError:
+        fallback = locale if locale in ("en", "uk") else "en"
+        return _login_redirect(settings, fallback, "not_configured")
+    response = RedirectResponse(started.authorization_url, status_code=status.HTTP_302_FOUND)
+    # Binds the flow to this browser; checked against the returned state (login CSRF).
+    response.set_cookie(
+        SIGN_IN_STATE_COOKIE,
+        started.state,
+        max_age=600,
+        httponly=True,
+        secure=settings.secure_cookies,
+        samesite="lax",  # sent on Google's top-level redirect back to the callback
+        path=SIGN_IN_COOKIE_PATH,
+        domain=settings.cookie_domain,
+    )
+    return response
+
+
+@router.get(
+    "/oauth/google/callback",
+    include_in_schema=False,
+    dependencies=[Depends(rate_limit("signin-callback", limit=30, window_seconds=900))],
+)
+async def google_sign_in_callback(
+    request: Request,
+    settings: SettingsDep,
+    google: GoogleSignInDep,
+    code: Annotated[str | None, Query(max_length=8192)] = None,
+    state: Annotated[str | None, Query(max_length=512)] = None,
+    error: Annotated[str | None, Query(max_length=200)] = None,
+) -> RedirectResponse:
+    outcome = await google.complete(
+        code=code,
+        state=state,
+        browser_state=request.cookies.get(SIGN_IN_STATE_COOKIE),
+        provider_error=error,
+        ip_address=client_ip(request),
+        user_agent=user_agent(request),
+    )
+    if outcome.session_token is None:
+        response = _login_redirect(settings, outcome.locale, outcome.error or "provider_error")
+    else:
+        response = RedirectResponse(
+            f"{settings.app_base_url}/{outcome.locale}{outcome.next_path}",
+            status_code=status.HTTP_302_FOUND,
+        )
+        _set_session_cookie(response, settings, outcome.session_token)
+        _set_csrf_cookie(response, settings)  # rotate on privilege change
+    response.delete_cookie(
+        SIGN_IN_STATE_COOKIE, path=SIGN_IN_COOKIE_PATH, domain=settings.cookie_domain
+    )
+    return response

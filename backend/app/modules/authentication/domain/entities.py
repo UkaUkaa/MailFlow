@@ -52,3 +52,28 @@ def validate_password(password: str, *, field: str = "password") -> None:
         raise InvalidInputError(problems=[FieldProblem(field, "password_too_long")])
     if password.strip() != password or not password.strip():
         raise InvalidInputError(problems=[FieldProblem(field, "password_whitespace")])
+
+
+class SignInProviderKind(StrEnum):
+    """External identity providers that can sign a user in to MailFlow itself.
+
+    Unrelated to mailbox providers: signing in proves who the MailFlow user is and never
+    grants access to mail.
+    """
+
+    GOOGLE = "google"
+
+
+@dataclass(frozen=True, slots=True)
+class ExternalIdentity:
+    """A user identity asserted by an external provider after a completed sign-in."""
+
+    provider: SignInProviderKind
+    subject: str  # stable provider account id (OIDC ``sub``); never the e-mail address
+    email: str
+    email_verified: bool
+    display_name: str
+
+
+class ExternalSignInError(Exception):
+    """The provider rejected the exchange or returned an unusable identity."""

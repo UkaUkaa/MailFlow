@@ -436,6 +436,18 @@
       "invalidTitle": "This link did not work",
       "invalidDescription": "The password reset link is missing or incomplete.",
       "requestNew": "Request a new link"
+    },
+    "google": {
+      "continue": "Continue with Google",
+      "or": "or",
+      "errors": {
+        "access_denied": "Google sign-in was cancelled.",
+        "email_not_verified": "Your Google account email is not verified. Verify it with Google or sign in with a password.",
+        "account_disabled": "This MailFlow account is deactivated.",
+        "invalid_state": "The sign-in link expired or was opened in another browser. Please try again.",
+        "not_configured": "Google sign-in is not available on this server.",
+        "provider_error": "Google sign-in failed. Please try again."
+      }
     }
   },
   "validation": {
@@ -608,5 +620,130 @@
       }
     },
     "close": "Close settings"
+  },
+  "legal": {
+    "navLabel": "Legal",
+    "updated": "Last updated: {date}",
+    "privacy": {
+      "title": "Privacy Policy",
+      "intro": "This policy explains what information MailFlow (mailflow.pp.ua) collects, how it is used and protected, and the choices you have. MailFlow is an email client: it shows the mailboxes you connect in one interface and acts on them only when you ask it to.",
+      "sections": {
+        "collect": {
+          "title": "Information we collect",
+          "body": {
+            "p1": "<strong>Your MailFlow account.</strong> Your email address, display name and a password hash (Argon2id; we never store the password itself). If you sign in with Google, we receive your Google account ID, email address and name.",
+            "p2": "<strong>Connected mailboxes.</strong> When you connect a mailbox (for example Gmail), we store the access credentials you grant (OAuth tokens, encrypted with AES-256-GCM) and a working copy of your mail needed to show and search it: message headers, bodies, folder and label information, and attachment names, types and sizes. Attachment contents are fetched from your provider when you open or download them.",
+            "p3": "<strong>Security and operations.</strong> Session records (creation time, last activity, IP address and browser user agent) and a security audit log of events such as sign-ins and connected accounts. Your interface settings, such as language and theme."
+          }
+        },
+        "use": {
+          "title": "How we use information",
+          "body": {
+            "p1": "We use your information only to provide the features you use: signing you in, synchronizing, displaying, searching, organizing, composing and sending email, and keeping your account secure.",
+            "p2": "We do not sell your information, we do not use it for advertising, and we do not use the content of your mail to build profiles or to train artificial intelligence models."
+          }
+        },
+        "google": {
+          "title": "Google user data",
+          "body": {
+            "p1": "<strong>Sign in with Google</strong> uses the openid, email and profile scopes only to create and identify your MailFlow account. It does not give MailFlow access to your mail.",
+            "p2": "<strong>Connecting Gmail</strong> uses the gmail.modify scope so MailFlow can read, label, archive, move to trash, draft and send messages in that mailbox at your request. It does not allow permanent deletion or access to your Gmail settings.",
+            "p3": "MailFlow's use and transfer to any other app of information received from Google APIs will adhere to the <policy>Google API Services User Data Policy</policy>, including the Limited Use requirements.",
+            "p4": "People do not read your Gmail data unless you give explicit permission for specific messages, it is necessary for security purposes (such as investigating abuse), or it is required by law. Gmail data is not transferred to third parties except as needed to provide the service, to comply with law, or as part of a merger or acquisition with notice to you."
+          }
+        },
+        "sharing": {
+          "title": "Sharing",
+          "body": {
+            "p1": "We share information only with the email providers you connect (to perform the actions you request) and with infrastructure providers that host the service on our behalf under confidentiality obligations. We disclose information to authorities only when the law requires it."
+          }
+        },
+        "security": {
+          "title": "Security",
+          "body": {
+            "p1": "All traffic is encrypted with HTTPS. Mailbox credentials are encrypted at rest and never shown in the interface or written to logs. Each user's data is isolated from other users at the application and database level. Email content is sanitized and displayed in an isolated frame, with remote images blocked by default."
+          }
+        },
+        "retention": {
+          "title": "Retention and deletion",
+          "body": {
+            "p1": "We keep your information while your account is active. Disconnecting a mailbox removes its credentials and its copy of your mail from MailFlow. Deleting your account in Settings removes your account and all associated data.",
+            "p2": "You can also revoke MailFlow's access to your Google account at any time in your <permissions>Google Account permissions</permissions>."
+          }
+        },
+        "rights": {
+          "title": "Your rights",
+          "body": {
+            "p1": "You can view and change your profile, disconnect mailboxes and delete your account in Settings. To request a copy of your data or ask any question about privacy, contact <email></email>."
+          }
+        },
+        "children": {
+          "title": "Children",
+          "body": {
+            "p1": "MailFlow is not intended for children under 16, and we do not knowingly collect their information."
+          }
+        },
+        "changes": {
+          "title": "Changes and contact",
+          "body": {
+            "p1": "If we change this policy we will update the date above, and for significant changes we will notify you in the app or by email. Questions: <email></email>."
+          }
+        }
+      }
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "intro": "These terms govern your use of MailFlow (mailflow.pp.ua). By creating an account or using the service you agree to them.",
+      "sections": {
+        "service": {
+          "title": "The service",
+          "body": {
+            "p1": "MailFlow is a web email client that lets you work with one or more external mailboxes you connect, such as Gmail, in a single interface. Your mail remains with your email provider; MailFlow acts on it at your request."
+          }
+        },
+        "account": {
+          "title": "Your account",
+          "body": {
+            "p1": "You must provide accurate information and keep your sign-in credentials confidential. You are responsible for activity under your account. You may only connect mailboxes that you own or are authorized to use."
+          }
+        },
+        "use": {
+          "title": "Acceptable use",
+          "body": {
+            "p1": "Do not use MailFlow to send spam or unlawful content, to access other people's data without permission, to interfere with the service or other users, or to violate the terms of your email provider."
+          }
+        },
+        "third": {
+          "title": "Third-party services",
+          "body": {
+            "p1": "Connected mailboxes are provided by third parties such as Google, under their own terms. Your use of Google data through MailFlow is also subject to our Privacy Policy and the <policy>Google API Services User Data Policy</policy>."
+          }
+        },
+        "availability": {
+          "title": "Availability and warranty",
+          "body": {
+            "p1": "We work to keep MailFlow reliable and secure, but the service is provided \"as is\" without warranties of any kind. We may change or discontinue features."
+          }
+        },
+        "liability": {
+          "title": "Limitation of liability",
+          "body": {
+            "p1": "To the extent permitted by law, we are not liable for indirect or consequential damages, or for loss of data held by third-party providers, arising from your use of the service."
+          }
+        },
+        "termination": {
+          "title": "Termination",
+          "body": {
+            "p1": "You can delete your account at any time in Settings. We may suspend accounts that violate these terms. After deletion your data is removed as described in the Privacy Policy."
+          }
+        },
+        "changes": {
+          "title": "Changes and contact",
+          "body": {
+            "p1": "We may update these terms; the date above shows the current version, and significant changes will be announced in the app. Questions: <email></email>."
+          }
+        }
+      }
+    }
   }
 }

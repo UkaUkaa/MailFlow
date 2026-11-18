@@ -8,6 +8,8 @@ export interface MockOptions {
   gmailAvailable?: boolean;
   outlookAvailable?: boolean;
   imapAvailable?: boolean;
+  /** "Continue with Google" sign-in configured on the server (default: off). */
+  googleSignIn?: boolean;
   /** Make every authenticated call answer 401 after this many requests (session expiry). */
   expireAfter?: number;
 }
@@ -84,6 +86,7 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
       state.authenticated = true;
       return json(route, 200, { user });
     }
+    if (path === "/auth/providers") return json(route, 200, { google: options.googleSignIn ?? false });
     if (path === "/auth/register") return json(route, 202, { status: "verification_required" });
     if (path === "/auth/verify-email") {
       const body = request.postDataJSON() as { token: string };

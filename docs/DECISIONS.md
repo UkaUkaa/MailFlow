@@ -245,3 +245,32 @@ strength, an accent colour and the reader's text size.
   so contrast can be guaranteed and tested; free-form colour stays with mailboxes (D36).
 - **Reader text size sets only the base size.** Most HTML email sets its own sizes and is shown
   as authored; scaling it would fight the fit-to-width logic of the email frame.
+
+## D38 — Sign in with Google: OIDC in the authentication module, linked by subject
+- **Separate from Gmail access.** Sign-in asks only for `openid email profile` and stores no
+  Google token; connecting Gmail remains its own consent in `email_accounts`. A user can sign
+  in with one Google account and connect a different mailbox, and revoking one does not touch
+  the other. The same OAuth client is reused, with its own redirect URI.
+- **Identities are keyed by Google's `sub`**, not by e-mail address, in `user_identities`.
+  Like `user_sessions` it is read before anyone is authenticated, so it is not under tenant RLS;
+  it is only ever queried by `(provider, subject)` taken from a validated exchange.
+- **Automatic linking by verified e-mail.** If no identity matches, an account with the same
+  address is linked, but only when Google says the address is verified. If that account never
+  verified its address, its password is replaced with an unusable one and its sessions are
+  revoked, so a pre-registered password cannot outlive the real owner's sign-in. New accounts get
+  an unusable random Argon2id password; "forgot password" sets a real one.
+- **State in Redis plus a browser-bound cookie.** The state (with PKCE verifier and nonce) is
+  single-use with a 10-minute TTL; the callback also requires the same value in an HttpOnly
+  `SameSite=Lax` cookie scoped to `/api/v1/auth/oauth/`, which defeats login CSRF.
+- **ID token validated without JWKS.** The token is received directly from Google's token
+  endpoint over verified TLS in exchange for the client secret and PKCE verifier, which OIDC
+  Core 3.1.3.7 (6) accepts in place of signature validation; `iss`, `aud`, `exp` and `nonce`
+  are checked.
+
+## D39 — System mail is sent after the response
+Verification and reset messages are handed to FastAPI background tasks instead of being sent
+inside the request. A real SMTP round trip (hundreds of milliseconds) would otherwise make
+`register` and `password/forgot` measurably slower for addresses that get mail, revealing which
+addresses exist. Celery was not used: the task would have to carry the address and the one-time
+token, and Celery arguments must hold only IDs. A process restart between the response and the
+send loses the message; the user can request a new one (resend is rate limited).

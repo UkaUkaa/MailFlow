@@ -8,6 +8,9 @@ from typing import Literal
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Local mail catchers (and "nothing configured"): mail sent there never reaches a real inbox.
+_MAIL_CATCHERS = frozenset({"", "mailpit", "localhost", "127.0.0.1", "::1"})
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", case_sensitive=False)
@@ -68,6 +71,8 @@ class Settings(BaseSettings):
     smtp_username: str = ""
     smtp_password: SecretStr = SecretStr("")
     smtp_starttls: bool = False
+    # Implicit TLS from the first byte (usually port 465). Mutually exclusive with STARTTLS.
+    smtp_tls: bool = False
     mail_from: str = "MailFlow <no-reply@mailflow.local>"
 
     max_request_body_bytes: int = 30 * 1024 * 1024
@@ -114,7 +119,16 @@ class Settings(BaseSettings):
                 )
             if self.mail_tls_ca_file:
                 raise ValueError("MAIL_TLS_CA_FILE is only allowed when ENVIRONMENT=test")
+        if self.smtp_starttls and self.smtp_tls:
+            raise ValueError("SMTP_STARTTLS and SMTP_TLS are mutually exclusive")
         if self.environment == "production":
+            if self.smtp_host.strip().lower() in _MAIL_CATCHERS:
+                raise ValueError(
+                    "a real SMTP server (SMTP_HOST) must be configured in production; "
+                    "verification and password reset emails are not delivered otherwise"
+                )
+            if not (self.smtp_starttls or self.smtp_tls):
+                raise ValueError("SMTP_STARTTLS or SMTP_TLS must be enabled in production")
             if not self.app_base_url.startswith("https://"):
                 raise ValueError("APP_BASE_URL must be https in production")
             if not self.vault_keys.get_secret_value():
@@ -146,6 +160,11 @@ class Settings(BaseSettings):
         return self.google_redirect_uri or (
             f"{self.app_base_url}/api/v1/accounts/oauth/gmail/callback"
         )
+
+    @property
+    def google_sign_in_redirect_uri(self) -> str:
+        """Callback for "Sign in with Google" (MailFlow login, not mailbox access)."""
+        return f"{self.app_base_url}/api/v1/auth/oauth/google/callback"
 
     @property
     def gmail_configured(self) -> bool:

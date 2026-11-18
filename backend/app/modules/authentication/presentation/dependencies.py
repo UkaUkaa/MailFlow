@@ -6,17 +6,25 @@ from datetime import timedelta
 from functools import lru_cache
 from typing import Annotated, cast
 
-from fastapi import Depends, Request
+import httpx
+from fastapi import BackgroundTasks, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings
 from app.core.database.engine import set_tenant
-from app.core.dependencies import DbSession, SettingsDep, get_clock, get_rate_limiter
+from app.core.dependencies import (
+    DbSession,
+    RedisDep,
+    SettingsDep,
+    get_clock,
+    get_rate_limiter,
+)
 from app.core.security.passwords import Argon2PasswordHasher
 from app.core.security.tokens import generate_token, hash_token
 from app.infrastructure.mailer import build_mailer
 from app.infrastructure.redis import RedisRateLimiter
 from app.modules.audit.infrastructure import SqlAuditLog
+from app.modules.authentication.application.external_sign_in import ExternalSignInService
 from app.modules.authentication.application.services import (
     AuthPolicy,
     PasswordService,
@@ -25,11 +33,14 @@ from app.modules.authentication.application.services import (
     TokenFactory,
 )
 from app.modules.authentication.domain.entities import AuthContext
+from app.modules.authentication.infrastructure.google_sign_in import GoogleSignInClient
 from app.modules.authentication.infrastructure.notifier import EmailAuthNotifier
 from app.modules.authentication.infrastructure.repositories import (
+    SqlIdentityRepository,
     SqlOneTimeTokenRepository,
     SqlSessionRepository,
 )
+from app.modules.authentication.infrastructure.sign_in_states import RedisSignInStateStore
 from app.modules.users.infrastructure import SqlUserRepository
 from app.shared.domain.errors import UnauthenticatedError
 
@@ -63,12 +74,13 @@ def get_audit_log(request: Request) -> SqlAuditLog:
 AuditDep = Annotated[SqlAuditLog, Depends(get_audit_log)]
 
 
-def get_notifier(settings: SettingsDep) -> EmailAuthNotifier:
+def get_notifier(settings: SettingsDep, background: BackgroundTasks) -> EmailAuthNotifier:
     return EmailAuthNotifier(
         build_mailer(settings),
         base_url=settings.app_base_url,
         verification_hours=settings.verification_token_ttl_hours,
         reset_minutes=settings.password_reset_token_ttl_minutes,
+        defer=background.add_task,
     )
 
 
@@ -129,6 +141,38 @@ def get_password_service(
 
 
 SessionServiceDep = Annotated[SessionService, Depends(get_session_service)]
+
+
+def get_google_sign_in(request: Request, settings: SettingsDep) -> GoogleSignInClient:
+    return GoogleSignInClient(
+        cast(httpx.AsyncClient, request.app.state.runtime.http),
+        client_id=settings.google_client_id,
+        client_secret=settings.google_client_secret.get_secret_value(),
+        redirect_uri=settings.google_sign_in_redirect_uri,
+    )
+
+
+def get_google_sign_in_service(
+    db: DbSession,
+    redis: RedisDep,
+    audit: AuditDep,
+    sessions: SessionServiceDep,
+    provider: Annotated[GoogleSignInClient, Depends(get_google_sign_in)],
+) -> ExternalSignInService:
+    return ExternalSignInService(
+        provider,
+        RedisSignInStateStore(redis),
+        SqlIdentityRepository(db),
+        SqlUserRepository(db),
+        sessions,
+        SqlSessionRepository(db),
+        get_password_hasher(),
+        audit,
+        get_clock(),
+    )
+
+
+GoogleSignInDep = Annotated[ExternalSignInService, Depends(get_google_sign_in_service)]
 
 
 async def require_auth(
