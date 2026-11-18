@@ -1,0 +1,173 @@
+name: CI
+
+# Tests on every pull request and every push to main. A push to main whose tests are all green
+# is deployed to the production server (job `deploy`); if any test fails, nothing is deployed.
+#
+# Deploy setup (Settings -> Secrets and variables -> Actions), see docs/DOCKER.md "Auto-deploy":
+#   variables: DEPLOY_HOST, DEPLOY_USER, DEPLOY_PATH, DEPLOY_URL, optional DEPLOY_PORT (22)
+#   secrets:   DEPLOY_SSH_KEY (private key), DEPLOY_KNOWN_HOSTS (ssh-keyscan of the server)
+# Until DEPLOY_HOST is set the deploy job is skipped.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend (ruff, mypy, pytest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Start PostgreSQL, Redis and GreenMail
+        working-directory: .
+        run: docker compose -f docker-compose.dev.yml up -d --wait postgres redis greenmail
+
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen --python 3.12
+
+      - name: Ruff
+        run: uv run ruff check . && uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy app
+
+      - name: Pytest
+        run: uv run pytest -q
+
+      - name: Service logs on failure
+        if: failure()
+        working-directory: .
+        run: docker compose -f docker-compose.dev.yml logs --tail 100
+
+  frontend:
+    name: Frontend (lint, typecheck, unit, e2e)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: frontend
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: E2E (viewport matrix)
+        run: pnpm e2e
+
+      - name: Upload Playwright traces
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: playwright-results
+          path: frontend/e2e/.results
+          retention-days: 7
+
+  deploy:
+    name: Deploy to production
+    needs: [backend, frontend]
+    if: >-
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main' &&
+      vars.DEPLOY_HOST != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: production
+      url: ${{ vars.DEPLOY_URL }}
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Configure SSH
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$SSH_KEY" ] || [ -z "$KNOWN_HOSTS" ]; then
+            echo "::error::DEPLOY_SSH_KEY and DEPLOY_KNOWN_HOSTS secrets are required"
+            exit 1
+          fi
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+
+      - name: Deploy ${{ github.sha }}
+        env:
+          HOST: ${{ vars.DEPLOY_HOST }}
+          USER_NAME: ${{ vars.DEPLOY_USER }}
+          PORT: ${{ vars.DEPLOY_PORT || '22' }}
+          APP_PATH: ${{ vars.DEPLOY_PATH }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/deploy_key -p "$PORT" \
+            -o StrictHostKeyChecking=yes -o BatchMode=yes -o ConnectTimeout=20 \
+            -o ServerAliveInterval=30 \
+            "$USER_NAME@$HOST" \
+            "cd $(printf '%q' "$APP_PATH") && git fetch --quiet origin main && git checkout --quiet $SHA -- scripts/deploy.sh && bash scripts/deploy.sh $SHA"
+
+      - name: Check the site responds
+        if: vars.DEPLOY_URL != ''
+        env:
+          URL: ${{ vars.DEPLOY_URL }}
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 12); do
+            code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$URL/en/login" || true)"
+            echo "attempt $i: HTTP $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 5
+          done
+          echo "::error::$URL/en/login did not answer 200 after deploy"
+          exit 1
+
+      - name: Remove SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
