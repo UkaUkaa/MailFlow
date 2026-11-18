@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Annotated
+from urllib.parse import unquote
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from fastapi import Cookie
@@ -23,6 +24,9 @@ TimeZoneCookie = Annotated[str | None, Cookie(alias=TZ_COOKIE, max_length=64)]
 def _zone(name: str | None) -> ZoneInfo | None:
     if not name:
         return None
+    # The browser writes the cookie with ``encodeURIComponent`` ("Europe%2FKyiv"); cookie
+    # parsing does not percent-decode, so decode here.
+    name = unquote(name)
     try:
         return ZoneInfo(name)
     except (ZoneInfoNotFoundError, ValueError, OSError):

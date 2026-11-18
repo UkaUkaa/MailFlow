@@ -509,6 +509,17 @@ async def test_local_time_is_converted_from_the_users_time_zone(
     assert datetime.fromisoformat(explicit.json()["send_at"]) == local
 
 
+async def test_percent_encoded_time_zone_cookie_is_accepted(alice, registry, runner, clock):
+    """The browser writes the zone with ``encodeURIComponent``: ``Europe%2FKyiv``."""
+    account_id, _ = await _mailbox(alice, registry, runner)
+    wall = (clock.now() + timedelta(days=2)).replace(tzinfo=None, microsecond=0).isoformat()
+    alice.client.cookies.set("mf_tz", "Europe%2FKyiv")
+
+    response = await _send(alice, _payload(account_id, send_at=wall))
+    assert response.status_code == 202, response.text
+    assert response.json()["status"] == "scheduled"
+
+
 async def test_unknown_time_zone_cookie_is_rejected(alice, registry, runner):
     account_id, _ = await _mailbox(alice, registry, runner)
     for bogus in ("Mars/Olympus", "../../etc/passwd", ""):
