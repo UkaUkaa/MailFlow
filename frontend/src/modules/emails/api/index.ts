@@ -23,6 +23,8 @@ export const threadKeys = {
 };
 
 const PAGE_SIZE = 30;
+/** How often an open mailbox list re-fetches to pick up mail the background sync brought in. */
+export const THREAD_LIST_REFRESH_MS = 2 * 60_000;
 const threadPageSchema = listSchema(threadSummarySchema);
 
 export function useThreadList(filter: ThreadListFilter, enabled = true) {
@@ -30,6 +32,8 @@ export function useThreadList(filter: ThreadListFilter, enabled = true) {
   return useInfiniteQuery({
     queryKey: threadKeys.list(filter),
     enabled: enabled && (!isSearch || Boolean(filter.query?.trim())),
+    // Search results stay as they were when the query ran; mailbox views poll for new mail.
+    refetchInterval: isSearch ? false : THREAD_LIST_REFRESH_MS,
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage: Page<ThreadSummary>) => lastPage.next_cursor,
     queryFn: ({ pageParam, signal }) =>
