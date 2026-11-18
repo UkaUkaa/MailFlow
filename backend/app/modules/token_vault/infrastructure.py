@@ -12,11 +12,13 @@ from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from sqlalchemy import (
     DateTime,
+    ForeignKey,
     ForeignKeyConstraint,
     LargeBinary,
     String,
     UniqueConstraint,
     delete,
+    func,
     select,
 )
 from sqlalchemy.dialects.postgresql import UUID, insert
@@ -24,7 +26,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database.base import Base, updated_at_column, uuid_pk
-from app.modules.token_vault.domain import CredentialKind, SealedSecret, VaultError
+from app.modules.token_vault.domain import (
+    CredentialKind,
+    SealedSecret,
+    UserSecretKind,
+    VaultError,
+)
 
 NONCE_BYTES = 12
 KEY_BYTES = 32
@@ -167,4 +174,66 @@ class SqlCredentialRepository:
                 r.expires_at,
             )
             for r in rows
+        ]
+
+
+class UserSecretModel(Base):
+    __tablename__ = "user_secrets"
+    __table_args__ = (UniqueConstraint("user_id", "kind"),)
+
+    id: Mapped[uuid.UUID] = uuid_pk()
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    key_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    nonce: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    ciphertext: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    updated_at: Mapped[datetime] = updated_at_column()
+
+
+class SqlUserSecretRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self._db = session
+
+    async def upsert(
+        self, *, user_id: uuid.UUID, kind: UserSecretKind, sealed: SealedSecret
+    ) -> None:
+        values = {"key_id": sealed.key_id, "nonce": sealed.nonce, "ciphertext": sealed.ciphertext}
+        stmt = insert(UserSecretModel).values(
+            id=uuid.uuid4(), user_id=user_id, kind=kind.value, **values
+        )
+        await self._db.execute(
+            stmt.on_conflict_do_update(
+                index_elements=["user_id", "kind"],
+                set_={**values, "updated_at": func.now()},
+                where=UserSecretModel.user_id == user_id,
+            )
+        )
+
+    async def get(self, user_id: uuid.UUID, kind: UserSecretKind) -> SealedSecret | None:
+        row = await self._db.scalar(
+            select(UserSecretModel)
+            .where(UserSecretModel.user_id == user_id, UserSecretModel.kind == kind.value)
+            .execution_options(populate_existing=True)
+        )
+        return SealedSecret(row.key_id, row.nonce, row.ciphertext) if row else None
+
+    async def delete(self, user_id: uuid.UUID, kind: UserSecretKind) -> None:
+        await self._db.execute(
+            delete(UserSecretModel).where(
+                UserSecretModel.user_id == user_id, UserSecretModel.kind == kind.value
+            )
+        )
+
+    async def list_stale(
+        self, user_id: uuid.UUID, primary_key_id: str
+    ) -> list[tuple[UserSecretKind, SealedSecret]]:
+        rows = await self._db.scalars(
+            select(UserSecretModel).where(
+                UserSecretModel.user_id == user_id, UserSecretModel.key_id != primary_key_id
+            )
+        )
+        return [
+            (UserSecretKind(r.kind), SealedSecret(r.key_id, r.nonce, r.ciphertext)) for r in rows
         ]

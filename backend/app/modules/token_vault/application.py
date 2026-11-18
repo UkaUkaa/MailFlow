@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Protocol
 
-from app.modules.token_vault.domain import CredentialKind, SealedSecret
+from app.modules.token_vault.domain import CredentialKind, SealedSecret, UserSecretKind
 
 
 class Cipher(Protocol):
@@ -90,5 +90,51 @@ class TokenVault:
                 sealed=fresh,
                 expires_at=expires_at,
             )
+            rotated += 1
+        return rotated
+
+
+class UserSecretRepository(Protocol):
+    async def upsert(
+        self, *, user_id: uuid.UUID, kind: UserSecretKind, sealed: SealedSecret
+    ) -> None: ...
+    async def get(self, user_id: uuid.UUID, kind: UserSecretKind) -> SealedSecret | None: ...
+    async def delete(self, user_id: uuid.UUID, kind: UserSecretKind) -> None: ...
+    async def list_stale(
+        self, user_id: uuid.UUID, primary_key_id: str
+    ) -> list[tuple[UserSecretKind, SealedSecret]]: ...
+
+
+def _user_aad(user_id: uuid.UUID, kind: UserSecretKind) -> bytes:
+    return f"mailflow:v1|{user_id}|user|{kind.value}".encode()
+
+
+class UserSecretVault:
+    """User-level secrets (e.g. the user's own AI API key), same keyring and guarantees as
+    mailbox credentials: AES-256-GCM, bound to owner and purpose, never returned or logged."""
+
+    def __init__(self, cipher: Cipher, repository: UserSecretRepository) -> None:
+        self._cipher = cipher
+        self._repo = repository
+
+    async def store(self, *, user_id: uuid.UUID, kind: UserSecretKind, secret: str) -> None:
+        sealed = self._cipher.seal(secret.encode(), aad=_user_aad(user_id, kind))
+        await self._repo.upsert(user_id=user_id, kind=kind, sealed=sealed)
+
+    async def read(self, *, user_id: uuid.UUID, kind: UserSecretKind) -> str | None:
+        sealed = await self._repo.get(user_id, kind)
+        if sealed is None:
+            return None
+        return self._cipher.open(sealed, aad=_user_aad(user_id, kind)).decode()
+
+    async def delete(self, *, user_id: uuid.UUID, kind: UserSecretKind) -> None:
+        await self._repo.delete(user_id, kind)
+
+    async def rotate_user(self, user_id: uuid.UUID) -> int:
+        rotated = 0
+        for kind, sealed in await self._repo.list_stale(user_id, self._cipher.primary_key_id):
+            aad = _user_aad(user_id, kind)
+            fresh = self._cipher.seal(self._cipher.open(sealed, aad=aad), aad=aad)
+            await self._repo.upsert(user_id=user_id, kind=kind, sealed=fresh)
             rotated += 1
         return rotated

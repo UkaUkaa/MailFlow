@@ -15,7 +15,7 @@ from app.core.database.base import TENANT_TABLES
 from app.core.database.engine import set_tenant, tenant_transaction
 from app.integrations.email_providers.contracts import ProviderAttachment
 from app.modules.token_vault.domain import CredentialKind, VaultError
-from tests.conftest import APP_URL, connect_mailbox
+from tests.conftest import APP_URL, connect_ai, connect_mailbox
 from tests.fakes import make_message
 
 
@@ -44,6 +44,11 @@ async def world(alice, bob, registry, runner):
             "/api/v1/emails/drafts",
             json={"account_id": str(account_id), "subject": "private draft"},
         )
+        template = await actor.client.post(
+            "/api/v1/templates", json={"name": f"Template of {actor.email}"}
+        )
+        assert template.status_code == 201, template.text
+        await connect_ai(actor, "openai", f"sk-key-of-{actor.email}")
         data[actor.email] = {
             "account": str(account_id),
             "thread": thread["id"],
@@ -51,6 +56,7 @@ async def world(alice, bob, registry, runner):
             "attachment": detail["messages"][0]["attachments"][0]["id"],
             "folder": next(f["id"] for f in folders if f["role"] == "custom"),
             "draft": draft.json()["id"],
+            "template": template.json()["id"],
             "mailbox": mailbox,
         }
     return data
@@ -417,3 +423,29 @@ async def test_account_avatar_is_isolated(alice, bob, world):
     assert response.status_code == 404
     assert (await alice.client.delete(url)).status_code == 404
     assert (await bob.client.get(url)).content == png
+
+
+async def test_user_secrets_are_bound_to_their_owner(alice, bob, world, runtime, owner_engine):
+    """A user's AI key cannot be read as someone else's, even if the row is moved."""
+    from app.core.database.engine import tenant_transaction as tx
+    from app.modules.token_vault.application import UserSecretVault
+    from app.modules.token_vault.domain import UserSecretKind, VaultError
+    from app.modules.token_vault.infrastructure import SqlUserSecretRepository
+
+    kind = UserSecretKind.AI_API_KEY
+    async with tx(runtime.session_factory, alice.user_id) as session:
+        vault = UserSecretVault(runtime.cipher, SqlUserSecretRepository(session))
+        assert await vault.read(user_id=alice.user_id, kind=kind) == f"sk-key-of-{alice.email}"
+        # RLS: Alice's session cannot see Bob's row at all.
+        assert await vault.read(user_id=bob.user_id, kind=kind) is None
+
+    async with owner_engine.begin() as conn:
+        await conn.execute(text("DELETE FROM user_secrets WHERE user_id = :b"), {"b": bob.user_id})
+        await conn.execute(
+            text("UPDATE user_secrets SET user_id = :b WHERE user_id = :a"),
+            {"a": alice.user_id, "b": bob.user_id},
+        )
+    async with tx(runtime.session_factory, bob.user_id) as session:
+        vault = UserSecretVault(runtime.cipher, SqlUserSecretRepository(session))
+        with pytest.raises(VaultError):
+            await vault.read(user_id=bob.user_id, kind=kind)

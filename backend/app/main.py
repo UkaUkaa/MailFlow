@@ -21,6 +21,7 @@ from app.core.middleware import (
     RequestContextMiddleware,
     SecurityHeadersMiddleware,
 )
+from app.modules.assistant.presentation import router as assistant_router
 from app.modules.attachments.presentation import router as attachments_router
 from app.modules.authentication.presentation.router import router as auth_router
 from app.modules.email_accounts.presentation.router import router as accounts_router
@@ -30,6 +31,7 @@ from app.modules.outbox.presentation import router as outbox_router
 from app.modules.search.presentation import router as search_router
 from app.modules.settings.presentation import router as settings_router
 from app.modules.synchronization.presentation import router as sync_router
+from app.modules.templates.presentation import router as templates_router
 from app.modules.users.presentation import router as users_router
 
 logger = get_logger(__name__)
@@ -126,6 +128,8 @@ def create_app(settings: Settings | None = None, runtime: Runtime | None = None)
         outbox_router,
         attachments_router,
         search_router,
+        templates_router,
+        assistant_router,
     ):
         api.include_router(router)
     app.include_router(health)

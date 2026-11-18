@@ -24,6 +24,7 @@ from app.modules.outbox.application import OutboxDispatcher
 from app.modules.synchronization.application import SyncPolicy, SyncRunner
 from tests.fakes import (
     CapturingNotifier,
+    FakeAiGateway,
     FakeClock,
     FakeRegistry,
     RecordingOutboxQueue,
@@ -89,6 +90,7 @@ async def runtime(settings: Settings, owner_engine: AsyncEngine) -> AsyncIterato
         await conn.execute(text(f"TRUNCATE {names} CASCADE"))
     rt = Runtime.create(settings, sync_queue=RecordingQueue(), outbox_queue=RecordingOutboxQueue())
     rt.registry = FakeRegistry()
+    rt.ai_gateway = FakeAiGateway()  # never call a real AI provider from tests
     await rt.redis.flushdb()
     yield rt
     await rt.close()
@@ -244,6 +246,22 @@ def sync_policy() -> SyncPolicy:
 @pytest.fixture
 def runner(runtime: Runtime, sync_policy: SyncPolicy) -> SyncRunner:
     return build_runner(runtime, sync_policy)
+
+
+@pytest.fixture
+def ai(runtime: Runtime) -> FakeAiGateway:
+    assert isinstance(runtime.ai_gateway, FakeAiGateway)
+    return runtime.ai_gateway
+
+
+async def connect_ai(
+    actor: Actor, provider: str = "openai", api_key: str = "sk-test-key-1234"
+) -> dict:  # type: ignore[type-arg]
+    response = await actor.client.put(
+        "/api/v1/assistant", json={"provider": provider, "api_key": api_key}
+    )
+    assert response.status_code == 200, response.text
+    return response.json()  # type: ignore[no-any-return]
 
 
 @pytest.fixture

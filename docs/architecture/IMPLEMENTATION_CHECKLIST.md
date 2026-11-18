@@ -39,6 +39,11 @@ Update this file whenever an item changes state.
 - [x] Send later and undo send on a scheduled outbox (D42): schedule, list, reschedule, cancel,
       exactly-once dispatch by Celery; verified with the fake provider and GreenMail SMTP.
       UI (send-later menu, undo toast, Scheduled view, setting) verified with the mocked API only
+- [x] Message templates (CRUD, placeholders, insert and save from the composer); backend tested
+      against PostgreSQL, UI with the mocked API
+- [~] AI replies with the user's own key (D43): OpenAI, Anthropic, Gemini; key in the Token Vault,
+      context from the thread and sent mail, language detection; tested with fakes and mocked HTTP,
+      **not yet against the live provider APIs**
 - [x] Account deletion and deactivation
 
 ## Phase 6 — Responsive frontend

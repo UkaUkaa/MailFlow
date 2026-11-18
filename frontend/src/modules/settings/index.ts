@@ -1,7 +1,8 @@
 export { settingsSchema } from "./types";
 export type { Settings } from "./types";
 export { useSettings, useUpdateSettings, settingsKeys } from "./api";
-export { SettingsPage } from "./components/settings-section";
+export { SettingsCard, SettingsPage, SettingsRow } from "./components/settings-section";
+export { Choice } from "./components/choice";
 export { SettingsLayout } from "./components/settings-layout";
 export { SettingsSync } from "./components/settings-sync";
 export { ProfileSettings } from "./components/profile-settings";

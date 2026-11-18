@@ -16,6 +16,19 @@ export interface MockOptions {
   settings?: Partial<typeof settings>;
   /** Sends already scheduled (or failed) when the test starts. */
   outbox?: OutboxFixture[];
+  /** The user's own AI key is already connected with this provider (default: none). */
+  aiProvider?: "openai" | "anthropic" | "gemini";
+  /** Saved message templates when the test starts. */
+  templates?: TemplateFixture[];
+}
+
+export interface TemplateFixture {
+  id: string;
+  name: string;
+  subject: string;
+  body_html: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface RecordedCall {
@@ -31,6 +44,26 @@ export interface MockApi {
   expireSession: () => void;
   /** The worker picked every held send up: from now on cancelling is too late. */
   startSending: () => void;
+}
+
+const AI_MODELS = {
+  openai: ["gpt-5", "gpt-5-mini", "gpt-4o"],
+  anthropic: ["claude-opus-5-5", "claude-sonnet-5-5"],
+  gemini: ["gemini-2.5-pro", "gemini-2.5-flash"],
+} as const;
+
+/** `/assistant` as the server returns it: never the key, only its last four characters. */
+interface AiConfig {
+  configured: boolean;
+  provider: keyof typeof AI_MODELS | null;
+  model: string | null;
+  key_hint: string | null;
+  models: string[];
+}
+
+function aiConfig(provider: keyof typeof AI_MODELS | null, hint: string | null): AiConfig {
+  if (!provider) return { configured: false, provider: null, model: null, key_hint: null, models: [] };
+  return { configured: true, provider, model: AI_MODELS[provider][0] as string, key_hint: hint, models: [...AI_MODELS[provider]] as string[] };
 }
 
 /** The JSON part of a multipart `/emails/send` body. */
@@ -93,6 +126,9 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
     authedCalls: 0,
     outbox: structuredClone(options.outbox ?? []),
     outboxIds: 0,
+    templates: structuredClone(options.templates ?? []),
+    assistant: options.aiProvider ? aiConfig(options.aiProvider, "abcd") : aiConfig(null, null),
+    templateIds: 0,
   };
   const calls: RecordedCall[] = [];
   const applyAction = (thread: (typeof state.threads)[number], action: string) => {
@@ -347,6 +383,47 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
         return json(route, 200, outboxSummary(item));
       }
       return json(route, 200, { ...item, undo: undefined });
+    }
+    if (path === "/assistant") {
+      if (method === "PUT") {
+        const body = request.postDataJSON() as { provider: "openai" | "anthropic" | "gemini"; api_key: string };
+        if (body.api_key.includes("bad")) return error(route, 422, "assistant_key_invalid");
+        state.assistant = aiConfig(body.provider, body.api_key.slice(-4));
+      } else if (method === "PATCH") {
+        state.assistant = { ...state.assistant, model: (request.postDataJSON() as { model: string }).model };
+      } else if (method === "DELETE") {
+        state.assistant = aiConfig(null, null);
+        return route.fulfill({ status: 204, body: "" });
+      }
+      return json(route, 200, state.assistant);
+    }
+    if (path === "/assistant/reply") {
+      if (!state.assistant.configured) return error(route, 409, "assistant_not_configured");
+      const body = request.postDataJSON() as { instruction: string };
+      return json(route, 200, {
+        language: "en",
+        body_html: `<p>Hi Daniel,</p><p>${body.instruction ? "Thursday works for me." : "Thanks for the update."}</p><p>Best,<br>Sasha</p>`,
+      });
+    }
+    if (path === "/templates") {
+      if (method === "POST") {
+        const body = request.postDataJSON() as Omit<TemplateFixture, "id" | "created_at" | "updated_at">;
+        const created = { id: `tpl-${++state.templateIds}`, ...body, created_at: "2026-11-18T09:00:00Z", updated_at: "2026-11-18T09:00:00Z" };
+        state.templates.push(created);
+        return json(route, 201, created);
+      }
+      return json(route, 200, { items: [...state.templates].sort((a, b) => a.name.localeCompare(b.name)) });
+    }
+    const templateMatch = /^\/templates\/([^/]+)$/.exec(path);
+    if (templateMatch) {
+      const index = state.templates.findIndex((item) => item.id === templateMatch[1]);
+      if (index < 0) return error(route, 404, "not_found");
+      if (method === "DELETE") {
+        state.templates.splice(index, 1);
+        return route.fulfill({ status: 204, body: "" });
+      }
+      Object.assign(state.templates[index]!, request.postDataJSON() as Partial<TemplateFixture>);
+      return json(route, 200, state.templates[index]);
     }
     if (path.startsWith("/emails/drafts")) {
       if (method === "DELETE") return route.fulfill({ status: 204, body: "" });

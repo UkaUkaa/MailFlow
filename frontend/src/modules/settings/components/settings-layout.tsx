@@ -1,6 +1,21 @@
 "use client";
 
-import { ArrowLeft, ChevronRight, KeyRound, LayoutPanelLeft, LogOut, Mail, MonitorSmartphone, Palette, TriangleAlert, UserRound, X, type LucideIcon } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  FileText,
+  KeyRound,
+  LayoutPanelLeft,
+  LogOut,
+  Mail,
+  MonitorSmartphone,
+  Palette,
+  Sparkles,
+  TriangleAlert,
+  UserRound,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { useLogout } from "@/modules/authentication";
@@ -15,9 +30,9 @@ import { useMediaQuery } from "@/shared/hooks/use-media-query";
 import { cn } from "@/shared/lib/cn";
 import { lastMailLocation } from "@/shared/lib/mail-location";
 
-type SectionKey = "profile" | "accounts" | "appearance" | "interface" | "security" | "sessions" | "danger";
+type SectionKey = "profile" | "accounts" | "appearance" | "interface" | "templates" | "assistant" | "security" | "sessions" | "danger";
 
-/** Grouped like the dialog's navigation: you, look and feel, access, and the way out. */
+/** Grouped like the dialog's navigation: you, look and feel, writing, access, and the way out. */
 const GROUPS: { key: SectionKey; icon: LucideIcon }[][] = [
   [
     { key: "profile", icon: UserRound },
@@ -26,6 +41,10 @@ const GROUPS: { key: SectionKey; icon: LucideIcon }[][] = [
   [
     { key: "appearance", icon: Palette },
     { key: "interface", icon: LayoutPanelLeft },
+  ],
+  [
+    { key: "templates", icon: FileText },
+    { key: "assistant", icon: Sparkles },
   ],
   [
     { key: "security", icon: KeyRound },

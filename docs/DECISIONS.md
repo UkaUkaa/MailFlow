@@ -336,3 +336,42 @@ closed tab would defeat. Approved as an addition to the MVP scope.
   rejected up front for everything that can be checked without the provider, but a provider
   refusal is reported in the Scheduled view rather than in the composer. Migration 0001 now
   carries its own frozen list of tenant tables so later migrations can add to `TENANT_TABLES`.
+
+## D43 — AI replies with each user's own key (OpenAI, Anthropic, Gemini), draft only
+
+**Context.** Users asked for "write the reply for me from a short note, in my style, in the
+conversation's language", and want to use the AI service they already pay for. Mail content
+leaves MailFlow for that service.
+
+**Decision.**
+- **Bring your own key.** Each user connects one of the most used services — OpenAI (ChatGPT),
+  Anthropic (Claude) or Google Gemini — with their own API key in Settings → AI replies. The
+  server has no AI key of its own and pays for nothing; usage is billed to the user's account.
+  Connecting is the opt-in: the form says what will be sent and to whom.
+- **Keys are credentials.** Stored only through the Token Vault in a new `user_secrets` table
+  (AES-256-GCM, AAD bound to user and kind, same keyring and rotation as mailbox credentials,
+  RLS). Never returned (only the last four characters), never logged, accepted as `SecretStr`.
+  The key is checked with the provider (model list) before it is stored; checks are limited to
+  10 per user per hour so MailFlow cannot be used to test stolen keys. Provider hosts are code
+  constants; Gemini's key travels in a header, never in the URL.
+- **Models** come from the provider's own list for that key (filtered to text models that support
+  structured output), so new models appear without a release. The default is the first of a
+  short preferred list the key can use, else the newest; the user can change it.
+- **Draft only.** `POST /assistant/reply` returns text; it lands in the composer as an undoable
+  replacement of the body. The model has no tools; nothing is sent or saved by the assistant.
+- **Context is built on the server** from ids: the replied-to message and its conversation (up to
+  that message, quoted parts removed, newest kept within 30,000 characters), up to five of the
+  user's own sent messages from the same mailbox — to this correspondent first — as style
+  samples, the user's name and address. Ownership is checked by the normal user-scoped queries.
+- **Language** is chosen by the model from the latest message not written by the user, not from
+  the note; it reports a BCP 47 code, validated by the server and shown in the composer.
+- **Prompt injection.** Mail text is HTML-escaped and wrapped in data tags; the system prompt
+  says only the note is an instruction. The output is escaped into plain paragraphs and reviewed
+  by the user before anything is sent.
+- **Adapters.** One prompt and JSON schema for all; OpenAI Chat Completions (`json_schema`,
+  strict) and Gemini `generateContent` (`responseSchema`) over HTTPX; Claude through the
+  Anthropic SDK (structured output, server-side refusal fallback where the model supports it).
+  Provider errors map to clear codes (key rejected, model unavailable, limit/credit, refused).
+
+**Cost.** Mail content is processed by a third party the user chose, under that party's terms;
+this is disclosed in the form and the Privacy Policy. Drafts arrive whole (no streaming).

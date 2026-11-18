@@ -20,6 +20,9 @@ PostgreSQL 17. Schema is managed by Alembic (`backend/migrations`). UUID primary
 | `audit_events` | audit | no | no FK to users by design |
 | `user_settings` | settings | yes | PK = `user_id`; interface preferences (`list_density`, `list_preview_lines`, `show_avatars`, `account_tint`, `accent_color`, `reader_text_size`, migration 0003) and `undo_send_seconds` (migration 0006) validated in the application |
 | `outbox_items` | outbox | yes | Scheduled sends (send later, undo send; migration 0006, D42). Unique `(user_id, idempotency_key)`; partial index on `next_attempt_at` for due work; body erased once sent or cancelled |
+| `message_templates` | templates | yes | Saved templates: name, subject, sanitized body HTML with `{{placeholders}}` (migration 0007). Index `(user_id, name)` |
+| `user_secrets` | token_vault | yes | User-level secrets (the user's own AI API key), AES-256-GCM ciphertext bound to user and kind; unique `(user_id, kind)` (migration 0007) |
+| `assistant_configs` | assistant | yes | The user's AI provider, chosen model, usable models and the key's last four characters; never the key (migration 0007, D43) |
 | `outbox_attachments` | outbox | yes | Uploaded files of a waiting outbox item (`bytea`); deleted with it and when it is sent or cancelled |
 | `email_accounts` | email_accounts | yes | unique `(user_id, provider, email_address)`; unique `(id, user_id)`; `color` checked to be `#rrggbb`; optional picture in `avatar_image` (deferred: never loaded with the list) + `avatar_media_type` + `avatar_updated_at` |
 | `oauth_states` | email_accounts | yes | hashed state, encrypted PKCE verifier |

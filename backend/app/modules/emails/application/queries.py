@@ -136,6 +136,23 @@ class ThreadQueryService:
         attachments = await self._attachments.list_for_messages(user_id, [message.id])
         return MessageView(message, attachments.get(message.id, []))
 
+    async def sent_samples(
+        self, user_id: uuid.UUID, account_id: uuid.UUID, recipient_email: str | None, limit: int
+    ) -> builtins.list[Message]:
+        """Messages the user wrote from this mailbox: to ``recipient_email`` first, then any."""
+        found: builtins.list[Message] = []
+        if recipient_email:
+            found = await self._mail.list_sent_messages(
+                user_id, account_id, recipient_email=recipient_email, limit=limit
+            )
+        if len(found) < limit:
+            seen = {m.id for m in found}
+            more = await self._mail.list_sent_messages(
+                user_id, account_id, recipient_email=None, limit=limit * 2
+            )
+            found += [m for m in more if m.id not in seen][: limit - len(found)]
+        return found
+
     async def unread_counts(
         self, user_id: uuid.UUID, account_id: uuid.UUID | None
     ) -> dict[FolderRole, int]:

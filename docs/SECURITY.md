@@ -190,3 +190,18 @@ encrypted). Encrypting message bodies at rest per tenant is a possible future ha
 ## Known limitations
 
 See `LIMITATIONS.md` (security section).
+
+## AI replies (D43)
+
+- Each user brings their own OpenAI, Anthropic or Gemini key. It is a credential: Token Vault
+  only (`user_secrets`, AES-256-GCM, AAD bound to user and kind, RLS, rotated with the keyring),
+  accepted as `SecretStr`, never returned (last four characters only) and never logged.
+- A key is verified with the provider before it is stored; at most 10 checks per user per hour.
+- Provider hosts are constants in code (no user-supplied URLs, redirects not followed); the
+  Gemini key is sent in a header, not the URL. Provider error bodies are never logged.
+- The API takes only ids and the user's note; the server reads the conversation and style
+  samples with user-scoped queries (cross-tenant ids are 404, covered by tests). One user's key
+  is never used for another user (tested).
+- Mail text sent to the model is escaped and fenced in data tags; the model has no tools; its
+  output is escaped into plain paragraphs and only placed in the composer for the user to review.
+- Per-user rate limit on drafts; nothing from the request or the draft is logged.
