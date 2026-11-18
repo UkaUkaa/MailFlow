@@ -17,6 +17,10 @@
   sync appears without reloading. Search results are not polled; hidden tabs do not poll.
 
 ### Fixed
+- **Tooltips piling up on the rail.** Collapsing the side menu could show the tooltip of every
+  item hovered while it was expanded, all at once. A tooltip now forgets any open requested
+  while it was switched off, and tooltips open on mouse hover only — no longer on focus, so a
+  control that keeps focus after a click does not keep its tooltip.
 - **Send later failed with 422.** The browser stores the `mf_tz` cookie URL-encoded
   (`Europe%2FKyiv`) and the server did not decode it, so every scheduled send and reschedule was
   rejected with `timezone_required`. The server now percent-decodes the zone name.
