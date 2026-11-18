@@ -8,6 +8,9 @@
   reader keeps remote images blocked.
 
 ### Fixed
+- **Send later failed with 422.** The browser stores the `mf_tz` cookie URL-encoded
+  (`Europe%2FKyiv`) and the server did not decode it, so every scheduled send and reschedule was
+  rejected with `timezone_required`. The server now percent-decodes the zone name.
 - **Home-screen app on iPhone.** MailFlow had no web app manifest, so iOS guessed the app's scope
   from the page that was added and showed the browser's address bar and back/forward controls on
   navigation outside it. Added `app/manifest.ts` (`scope` and `start_url` `/`, `standalone`),
