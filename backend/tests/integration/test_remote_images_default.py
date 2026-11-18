@@ -40,7 +40,7 @@ async def test_database_default_is_on(bob, owner_engine):
     assert stored is True
 
 
-async def test_migration_0005_switches_existing_users_on(alice, owner_engine):
+async def test_migration_0005_keeps_existing_choice(alice, owner_engine):
     await alice.client.patch("/api/v1/settings", json={"load_remote_images": False})
     config = Config("alembic.ini")
     # Alembic runs its own event loop, so it goes to a worker thread.
@@ -54,4 +54,4 @@ async def test_migration_0005_switches_existing_users_on(alice, owner_engine):
             text("SELECT load_remote_images FROM user_settings WHERE user_id = :u"),
             {"u": alice.user_id},
         )
-    assert stored is True
+    assert stored is False

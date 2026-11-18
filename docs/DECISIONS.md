@@ -285,7 +285,9 @@ restart window. The job deploys the exact tested SHA, not the branch head, and h
 dedicated SSH key. No automatic rollback; reverting on `main` redeploys the previous state.
 
 ## D41 — Remote images are shown by default
-`load_remote_images` now defaults to on (migration 0005 also switches it on for existing users).
+`load_remote_images` now defaults to on for new users. Migration 0005 changes only the column
+default: existing rows keep their value, because a stored false may be a deliberate opt-out. Until
+the settings response arrives the reader treats the setting as off.
 Most legitimate mail is unreadable without its images, and requiring a trip to settings was the
 main complaint. The HTML is still
 sanitized and rendered in the sandboxed iframe under CSP; only image loading is allowed. The cost

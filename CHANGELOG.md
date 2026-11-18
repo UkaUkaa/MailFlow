@@ -3,8 +3,9 @@
 ## [Unreleased]
 
 ### Changed
-- Remote images in emails are shown by default. Migration 0005 switches the setting on for
-  existing users; it can still be turned off in Settings → Appearance (D41).
+- Remote images in emails are shown by default for new users. Existing users keep their saved
+  choice; anyone can turn images off in Settings → Appearance (D41). Until settings load, the
+  reader keeps remote images blocked.
 
 ### Added
 - CI (`.github/workflows/ci.yml`): backend ruff, mypy and pytest against the dev

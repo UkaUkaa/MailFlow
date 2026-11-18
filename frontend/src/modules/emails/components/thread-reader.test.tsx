@@ -157,4 +157,11 @@ describe("ThreadReader remote images", () => {
     await renderReader();
     expect(await screen.findByTestId("message")).toHaveAttribute("data-images", "false");
   });
+
+  it("keeps them hidden while settings have not loaded or failed to load", async () => {
+    accounts = [makeAccount("acc-1")];
+    userSettings.data = undefined;
+    await renderReader();
+    expect(await screen.findByTestId("message")).toHaveAttribute("data-images", "false");
+  });
 });

@@ -1,5 +1,8 @@
 """remote images shown by default: flip the load_remote_images default to true
 
+Only the column default changes. Existing rows keep their value: a stored false may be a
+deliberate opt-out, which the migration cannot tell apart from the old default.
+
 Revision ID: 0005
 Revises: 0004
 """
@@ -14,7 +17,6 @@ depends_on = None
 
 def upgrade() -> None:
     op.alter_column('user_settings', 'load_remote_images', server_default=sa.text('true'))
-    op.execute("UPDATE user_settings SET load_remote_images = true")
 
 
 def downgrade() -> None:
