@@ -1,8 +1,12 @@
 "use client";
 
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { useCallback } from "react";
 import { toast } from "sonner";
+import { errorKey } from "@/infrastructure/api-client";
+import { useRouter } from "@/infrastructure/i18n/navigation";
+import { accountKeys } from "@/modules/accounts";
 import { useThreadAction } from "../api";
 import { INVERSE_ACTION } from "../lib/optimistic";
 import type { ThreadAction } from "../types";
@@ -17,11 +21,41 @@ const ANNOUNCED: ReadonlySet<ThreadAction> = new Set([
   "mark_unread",
 ]);
 
+/** Failures with a cause the user can act on get their own message instead of the generic one. */
+const EXPLAINED = new Set([
+  "provider_auth_required",
+  "provider_unavailable",
+  "provider_rate_limited",
+  "rate_limited",
+  "unsupported",
+  "network_error",
+]);
+
 /** Thread actions with user feedback: confirmation toast, undo where safe, error toast. */
 export function useThreadActions() {
   const t = useTranslations("mail.actions");
+  const te = useTranslations("errors");
+  const ta = useTranslations("accounts");
+  const router = useRouter();
+  const queryClient = useQueryClient();
   const mutation = useThreadAction();
   const { mutateAsync } = mutation;
+
+  const fail = useCallback(
+    (error: unknown) => {
+      const key = errorKey(error);
+      if (key === "provider_auth_required") {
+        // The server has marked the mailbox; refresh accounts so its "Reconnect" badge shows.
+        void queryClient.invalidateQueries({ queryKey: accountKeys.all });
+        toast.error(te(key), {
+          action: { label: ta("reconnect"), onClick: () => router.push("/settings/accounts") },
+        });
+        return;
+      }
+      toast.error(EXPLAINED.has(key) ? te(key) : t("failed"));
+    },
+    [queryClient, router, t, ta, te],
+  );
 
   const run = useCallback(
     (action: ThreadAction, threadIds: string[], options: { silent?: boolean } = {}) => {
@@ -37,16 +71,16 @@ export function useThreadActions() {
               ? {
                   label: t("undo"),
                   onClick: () => {
-                    mutateAsync({ threadIds, action: inverse }).catch(() => toast.error(t("failed")));
+                    mutateAsync({ threadIds, action: inverse }).catch(fail);
                   },
                 }
               : undefined,
           });
         },
-        () => toast.error(t("failed")),
+        fail,
       );
     },
-    [mutateAsync, t],
+    [mutateAsync, fail, t],
   );
 
   return { run, isPending: mutation.isPending };

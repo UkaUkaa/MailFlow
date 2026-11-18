@@ -23,6 +23,10 @@
   `--account-tint-rest` / `--account-tint-hover`), with a preview in the edit dialog.
 
 ### Fixed
+- A thread action (single or bulk) that failed showed only "The action could not be completed."
+  It now names the cause: for a mailbox that lost authorization (`409 provider_auth_required`)
+  the toast says it must be reconnected and offers "Reconnect" (Settings → Accounts); provider
+  outages, rate limits, unsupported actions and offline errors get their own messages too.
 - Saving an account colour failed with 422: the UI sent hex values, the API accepted only colour
   names. Colours are now `#rrggbb` throughout (migration `0002` converts stored names).
 
