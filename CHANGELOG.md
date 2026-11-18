@@ -17,6 +17,12 @@
   sync appears without reloading. Search results are not polled; hidden tabs do not poll.
 
 ### Fixed
+- **Unreadable emails on iPhone when the theme differs from the phone's.** Emails without colours
+  of their own (e.g. sent from a template) declared `color-scheme: light dark` in the reader frame.
+  With MailFlow on the light theme and the iPhone in dark mode, the frame's scheme no longer matched
+  the page's and Safari painted an opaque black backdrop under the light theme's dark text (and
+  white on white in the opposite case). The frame document and the iframe element now share exactly
+  one scheme: the app's resolved theme for such emails, light for styled ones.
 - **Tooltips piling up on the rail.** Collapsing the side menu could show the tooltip of every
   item hovered while it was expanded, all at once. A tooltip now forgets any open requested
   while it was switched off, and tooltips open on mouse hover only — no longer on focus, so a
