@@ -219,13 +219,20 @@ async def test_drafts_a_new_email_from_the_chosen_mailbox(alice, registry, runne
         "subject": "Фото з поїздки",
         "body_html": "<p>Привіт, Олено!</p><p>Надсилаю фото.<br>Обіймаю, Аліса</p>",
     }
-    (request,) = ai.requests
+    request = ai.requests[0]
     assert request.kind is DraftKind.NEW
     assert request.instruction == "send Olena the trip photos"
     assert request.my_email == MAILBOX
     assert request.correspondent_email == "olena@example.com"
     assert request.thread == ()
     assert request.style_samples  # the user's own sent mail to Olena
+
+    # A subject the user already typed is kept: none is suggested even if the model sends one.
+    typed = await alice.client.post(
+        COMPOSE, json={"account_id": account_id, "subject": "Photos", "instruction": "send them"}
+    )
+    assert typed.status_code == 200, typed.text
+    assert typed.json()["subject"] == ""
 
 
 async def test_forward_note_uses_the_forwarded_message_and_keeps_the_subject(

@@ -174,7 +174,12 @@ class AssistantService:
         return DraftedReply(
             language=normalize_language(draft.language),
             body_html=draft_to_html(draft.body),
-            subject=clean_subject(draft.subject) if request.kind is DraftKind.NEW else "",
+            # Only a new email without a subject gets one, whatever the model returned.
+            subject=(
+                clean_subject(draft.subject)
+                if request.kind is DraftKind.NEW and not request.subject
+                else ""
+            ),
         )
 
     async def draft_reply(

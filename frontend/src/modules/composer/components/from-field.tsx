@@ -33,16 +33,17 @@ export function FromField({
       {current ? (
         <AccountDot color={current.color} imageUrl={accountAvatarUrl(current)} className="size-2.5" imageClassName="size-5" />
       ) : null}
-      <span className="min-w-0 truncate text-sm">
+      {/* The address decides where the email goes out from: a long name gives way first. */}
+      <span className="flex min-w-0 items-baseline gap-1 text-sm">
         {current ? (
           <>
-            {name ? <span className="font-medium text-foreground">{name} </span> : null}
-            <span className={name ? "text-foreground-muted" : "font-medium text-foreground"}>
+            {name ? <span className="min-w-0 truncate font-medium text-foreground">{name}</span> : null}
+            <span className={cn("max-w-full shrink-0 truncate", name ? "text-foreground-muted" : "font-medium text-foreground")}>
               {name ? `<${current.email_address}>` : current.email_address}
             </span>
           </>
         ) : (
-          <span className="text-foreground-muted">{t("chooseAccount")}</span>
+          <span className="truncate text-foreground-muted">{t("chooseAccount")}</span>
         )}
       </span>
     </span>
