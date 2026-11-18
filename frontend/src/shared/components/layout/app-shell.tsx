@@ -163,6 +163,11 @@ export function AppShell({
               (panel.querySelector<HTMLElement>('nav a[aria-current="page"]') ?? panel).focus();
             }}
             onCloseAutoFocus={restoreFocus}
+            // Radix gives Escape only to the topmost layer, so an open tooltip of a focused
+            // button would take it and leave the panel open. Close on the key itself.
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setFlyoutOpen(false);
+            }}
             className="fixed inset-y-0 left-[var(--nav-offset)] z-50 flex w-60 max-w-[calc(100vw-var(--nav-offset))] flex-col border-r border-border bg-surface shadow-lg outline-none data-[state=open]:animate-flyout-in max-md:hidden"
           >
             <DialogPrimitive.Title className="sr-only">{drawerTitle}</DialogPrimitive.Title>

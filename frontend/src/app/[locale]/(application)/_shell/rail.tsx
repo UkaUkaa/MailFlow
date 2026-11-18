@@ -1,18 +1,19 @@
 "use client";
 
-import { Menu, Settings, SquarePen } from "lucide-react";
+import { Menu, PanelLeftOpen, Settings, SquarePen } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useComposer } from "@/modules/composer";
 import { FolderNav } from "@/modules/folders";
 import { Link, usePathname } from "@/infrastructure/i18n/navigation";
 import { useShell } from "@/shared/components/layout/app-shell";
 import { Tooltip } from "@/shared/components/ui/tooltip";
+import { QuickPreferences } from "./quick-preferences";
 
 const railButton =
   "flex size-7 shrink-0 items-center justify-center rounded-[7px] text-foreground-muted transition-colors hover:bg-muted hover:text-foreground aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-expanded:bg-muted aria-expanded:text-foreground touch:size-11";
 
 /**
- * Narrow icon rail (tablet and wider): compose, the mail views, "more" (the full navigation as
+ * Narrow icon rail (tablet and wider): expand-menu toggle, compose, the mail views, "more" (the full navigation as
  * a flyout) and, at the bottom, settings. Every icon has a tooltip and an accessible name.
  */
 export function Rail() {
@@ -23,6 +24,17 @@ export function Rail() {
 
   return (
     <div className="flex h-full min-h-0 flex-col items-center gap-5 py-4 touch:gap-3 touch:py-2">
+      <Tooltip label={t("pinSidebar")} side="right">
+        <button
+          type="button"
+          aria-label={t("pinSidebar")}
+          aria-expanded={false}
+          onClick={shell.togglePinned}
+          className={railButton}
+        >
+          <PanelLeftOpen className="size-5" aria-hidden />
+        </button>
+      </Tooltip>
       <Tooltip label={t("compose")} side="right">
         <button type="button" aria-label={t("compose")} onClick={composer.compose} className={railButton}>
           <SquarePen className="size-5" aria-hidden />
@@ -42,6 +54,9 @@ export function Rail() {
             <Menu className="size-5" aria-hidden />
           </button>
         </Tooltip>
+      </div>
+      <div className="flex shrink-0 flex-col items-center gap-[3px] touch:gap-0.5">
+        <QuickPreferences variant="rail" buttonClassName={railButton} />
       </div>
       <Tooltip label={t("settings")} side="right">
         <Link

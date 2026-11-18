@@ -69,10 +69,14 @@ test.describe("rail and flyout", () => {
     await mockApi(page);
     await page.goto("/en/mail/inbox");
     const more = page.getByRole("button", { name: "Accounts and folders" });
-    await more.focus();
-    await page.keyboard.press("Enter");
     const flyout = page.getByRole("dialog", { name: "Navigation" });
-    await expect(flyout).toBeVisible();
+    // A key press that lands before React has hydrated the button is lost, so retry until
+    // the flyout really opens (seen under parallel load).
+    await expect(async () => {
+      await more.focus();
+      await page.keyboard.press("Enter");
+      await expect(flyout).toBeVisible({ timeout: 1500 });
+    }).toPass();
     // While it is open the rest of the page is hidden from assistive technology, so query by CSS.
     await expect(page.locator("aside.mf-sidebar button[aria-haspopup=dialog]")).toHaveAttribute("aria-expanded", "true");
     await expect(flyout.getByRole("link", { name: "Inbox, 3 unread" })).toBeFocused();
@@ -107,7 +111,7 @@ test.describe("rail and flyout", () => {
     await mockApi(page);
     await page.goto("/en/mail/inbox");
     await page.getByRole("button", { name: "Accounts and folders" }).click();
-    await page.getByRole("button", { name: "Keep sidebar open" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Expand menu" }).click();
     const sidebar = page.locator("aside.mf-sidebar");
     await expect(sidebar).toHaveAttribute("data-pinned", "true");
     expect((await sidebar.boundingBox())?.width).toBe(240);
@@ -119,9 +123,85 @@ test.describe("rail and flyout", () => {
     await sidebar.getByRole("button", { name: "Compose" }).click();
     expect((await page.getByRole("dialog", { name: "New message" }).boundingBox())?.x).toBe(240);
     await page.keyboard.press("Escape");
-    await sidebar.getByRole("button", { name: "Collapse to icons" }).click();
+    await sidebar.getByRole("button", { name: "Collapse menu" }).click();
     await expect(sidebar).toHaveAttribute("data-pinned", "false");
     expect((await sidebar.boundingBox())?.width).toBe(70);
+  });
+
+  test("one button on the rail expands the menu and one in its header collapses it", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/en/mail/inbox");
+    const sidebar = page.locator("aside.mf-sidebar");
+    await expect(sidebar).toHaveAttribute("data-pinned", "false");
+    await sidebar.getByRole("button", { name: "Expand menu" }).click();
+    await expect(sidebar).toHaveAttribute("data-pinned", "true");
+    expect((await sidebar.boundingBox())?.width).toBe(240);
+    await expect(sidebar.getByRole("link", { name: /Inbox/ }).first()).toBeVisible();
+    // Keyboard: the collapse button is reachable and works with Enter.
+    const collapse = sidebar.getByRole("button", { name: "Collapse menu" });
+    await collapse.focus();
+    await page.keyboard.press("Enter");
+    await expect(sidebar).toHaveAttribute("data-pinned", "false");
+    expect((await sidebar.boundingBox())?.width).toBe(70);
+    await expect(sidebar.getByRole("button", { name: "Expand menu" })).toBeVisible();
+  });
+});
+
+test.describe("language and theme in the navigation", () => {
+  test("rail buttons switch the language and cycle the theme, and save both to the account", async ({ page }) => {
+    await mockApi(page);
+    const saved: string[] = [];
+    page.on("request", (request) => {
+      if (request.method() === "PATCH" && request.url().endsWith("/api/v1/settings")) saved.push(request.postData() ?? "");
+    });
+    await page.goto("/en/mail/inbox");
+    const rail = page.locator("aside.mf-sidebar");
+    const html = page.locator("html");
+
+    // Theme: system → light → dark, the icon button always names the next theme.
+    await rail.getByRole("button", { name: "Switch theme to Light" }).click();
+    await expect(html).toHaveAttribute("data-theme", "light");
+    await rail.getByRole("button", { name: "Switch theme to Dark" }).click();
+    await expect(html).toHaveAttribute("data-theme", "dark");
+    await expect(rail.getByRole("button", { name: "Switch theme to System" })).toBeVisible();
+
+    // Language: one click, the URL and the interface change and the place is kept.
+    await rail.getByRole("button", { name: "Switch language to Українська" }).click();
+    await expect(page).toHaveURL(/\/uk\/mail\/inbox$/);
+    await expect(html).toHaveAttribute("lang", "uk");
+    await expect(rail.getByRole("button", { name: "Змінити мову на English" })).toBeVisible();
+    await expect(html).toHaveAttribute("data-theme", "dark");
+
+    expect(saved.map((body) => JSON.parse(body))).toEqual([{ theme: "light" }, { theme: "dark" }, { locale: "uk" }]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+  });
+
+  test("the expanded menu and the phone drawer offer the same switches", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/en/mail/inbox");
+    const sidebar = page.locator("aside.mf-sidebar");
+    await sidebar.getByRole("button", { name: "Expand menu" }).click();
+    const language = sidebar.getByRole("group", { name: "Language" });
+    const theme = sidebar.getByRole("group", { name: "Theme" });
+    await expect(language.getByRole("button", { name: "English" })).toHaveAttribute("aria-pressed", "true");
+    await theme.getByRole("button", { name: "Dark" }).click();
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    // Both groups fit inside the 240px sidebar.
+    for (const control of [language, theme]) {
+      const box = await control.boundingBox();
+      expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(240);
+    }
+    await language.getByRole("button", { name: "Українська" }).click();
+    await expect(page).toHaveURL(/\/uk\/mail\/inbox$/);
+    await page.screenshot({ path: "e2e/screenshots/1440x900/uk-dark-11-menu-preferences.png" });
+
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.getByRole("button", { name: "Відкрити навігацію" }).click();
+    const drawer = page.getByRole("dialog");
+    await expect(drawer.getByRole("group", { name: "Мова" })).toBeVisible();
+    await expect(drawer.getByRole("group", { name: "Тема" })).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+    await page.screenshot({ path: "e2e/screenshots/320x568/uk-dark-11-drawer-preferences.png" });
   });
 });
 

@@ -17,14 +17,20 @@ custom `split` 900 and `3xl` 1920. Layouts must hold at every intermediate width
 
 ## Navigation
 
-- **Rail** (`md`+, the default): compose, the mail views (those the mailbox supports), "Accounts
-  and folders", and settings at the bottom. Icon buttons with tooltips; the open view is a solid
+- **Rail** (`md`+, the default): an "Expand menu" button, compose, the mail views (those the
+  mailbox supports), "Accounts and folders", and at the bottom a language button (shows the
+  current code, switches to the other language), a theme button (cycles system → light → dark)
+  and settings. Icon buttons with tooltips; the open view is a solid
   accent square; an accent dot marks views with unread mail.
 - **Flyout**: the "Accounts and folders" button opens the full navigation (views with unread
   counts, the mailbox's folders, account switcher, settings) as a 240px panel over the list pane.
   It is a modal Radix dialog without a backdrop: focus moves in and is trapped, Escape and a click
   outside close it, choosing a destination closes it, and focus returns to the button.
-- **Pinned sidebar**: the flyout's pin button keeps the same navigation open in place of the rail
+- **Pinned sidebar**: the rail's "Expand menu" button (or the same button in the flyout header)
+  keeps the full navigation open in place of the rail; "Collapse menu" in its header returns to
+  the rail. The full navigation (pinned, flyout and phone drawer) carries the segmented language
+  and theme switches above Settings. Language and theme chosen here are saved to the account
+  like in Settings → Appearance. Previously: the flyout's pin button kept the navigation open
   (240px). Stored in `localStorage` as `mf-sidebar` (`"false"` = pinned; anything else = rail).
 - **Phone**: bottom navigation (inbox, starred, compose, search, settings) and the drawer with the
   same full navigation.

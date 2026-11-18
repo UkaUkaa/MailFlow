@@ -84,7 +84,11 @@
 - Removed strings `nav.toggleSidebar`, `composer.minimize`, `composer.ccBcc`,
   `mail.searchPrompt*`; the floating, minimizable composer is gone.
 
+- Navigation: an "Expand menu" button on the rail and "Collapse menu" in the menu header;
+  language and theme switches in the rail (compact) and in the full menu and phone drawer.
+
 ### Fixed
+- Escape now closes the navigation flyout even while a tooltip of a focused button is open.
 - Escape did not close the composer while the caret was in the message body.
 - Closing the phone drawer did not return focus to the menu button.
 - Search by email address returned nothing (tsquery tokenisation).

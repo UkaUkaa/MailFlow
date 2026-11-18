@@ -44,8 +44,10 @@
       "search": "Пошук",
       "settings": "Опції"
     },
-    "pinSidebar": "Закріпити бічну панель",
-    "unpinSidebar": "Згорнути до значків",
+    "switchLanguage": "Змінити мову на {language}",
+    "switchTheme": "Змінити тему на {theme}",
+    "pinSidebar": "Розгорнути меню",
+    "unpinSidebar": "Згорнути меню",
     "more": "Облікові записи й папки",
     "accounts": "Облікові записи"
   },

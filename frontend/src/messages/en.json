@@ -44,8 +44,10 @@
       "search": "Search",
       "settings": "Settings"
     },
-    "pinSidebar": "Keep sidebar open",
-    "unpinSidebar": "Collapse to icons",
+    "switchLanguage": "Switch language to {language}",
+    "switchTheme": "Switch theme to {theme}",
+    "pinSidebar": "Expand menu",
+    "unpinSidebar": "Collapse menu",
     "more": "Accounts and folders",
     "accounts": "Accounts"
   },

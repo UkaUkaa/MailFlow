@@ -11,6 +11,7 @@ import { BrandGlyph } from "@/shared/components/layout/brand";
 import { PaneScroll } from "@/shared/components/layout/pane";
 import { Button } from "@/shared/components/ui/button";
 import { Tooltip } from "@/shared/components/ui/tooltip";
+import { QuickPreferences } from "./quick-preferences";
 
 /**
  * Full navigation: accounts, views with unread counts, folders, settings. The same content is
@@ -63,6 +64,7 @@ export function SidebarContent({ variant }: { variant: SidebarVariant }) {
       </PaneScroll>
 
       <div className="shrink-0 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <QuickPreferences variant="full" />
         <Link
           href="/settings"
           onClick={onNavigate}
