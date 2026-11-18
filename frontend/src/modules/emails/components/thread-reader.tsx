@@ -139,7 +139,7 @@ function ThreadBody({ thread, unified, onEmptied }: { thread: ThreadDetail; unif
                 key={message.id}
                 message={message}
                 defaultExpanded={index === lastIndex || !message.is_read}
-                alwaysShowImages={settings.data?.load_remote_images ?? false}
+                alwaysShowImages={settings.data?.load_remote_images ?? true}
                 onDraftDeleted={thread.messages.length === 1 ? onEmptied : undefined}
               />
             ))}

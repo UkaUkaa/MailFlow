@@ -12,7 +12,7 @@ credentials and sessions.
 |---|---|---|
 | Another tenant | Read or modify someone else's mail, accounts, settings | Ownership filter in every query, 404 for foreign objects, PostgreSQL RLS, composite foreign keys |
 | Anonymous attacker | Take over accounts | Argon2id, uniform errors, rate limits, hashed single-use tokens, session revocation |
-| Malicious email sender | Run script in the reader, track opens, break layout | Server-side sanitization, sandboxed iframe, CSP, remote images off by default |
+| Malicious email sender | Run script in the reader, track opens, break layout | Server-side sanitization, sandboxed iframe, CSP, remote images on by default but switchable off per user (see `docs/DECISIONS.md`) |
 | Malicious web page | Act with the user's session | CSRF token + Origin allowlist + SameSite cookies |
 | Database reader (backup leak, SQL access) | Use stored provider tokens | AES-256-GCM, keys outside the database, AAD binding to user/account |
 | Insider / operator | Read users' mail | No admin mail access exists; no impersonation feature; logs carry no content |

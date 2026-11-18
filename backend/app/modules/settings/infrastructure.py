@@ -21,7 +21,10 @@ class UserSettingsModel(Base):
     )
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
     theme: Mapped[str] = mapped_column(String(16), nullable=False, default="system")
-    load_remote_images: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Default flipped to on in migration 0005 (docs/DECISIONS.md).
+    load_remote_images: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=text("true")
+    )
     conversation_view: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Interface preferences (migration 0003). Server defaults fill rows written before them.
     list_density: Mapped[str] = mapped_column(

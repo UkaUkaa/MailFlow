@@ -283,3 +283,12 @@ than pushed to a registry: it matches the documented production command, needs n
 credentials and keeps one server simple. The cost is build time and CPU on the server and a short
 restart window. The job deploys the exact tested SHA, not the branch head, and holds only a
 dedicated SSH key. No automatic rollback; reverting on `main` redeploys the previous state.
+
+## D41 — Remote images are shown by default
+`load_remote_images` now defaults to on (migration 0005 also switches it on for existing users).
+Most legitimate mail is unreadable without its images, and requiring a trip to settings was the
+main complaint. The HTML is still
+sanitized and rendered in the sandboxed iframe under CSP; only image loading is allowed. The cost
+is privacy: senders can see when and from which IP a message is opened (tracking pixels). Users
+who want the old behaviour turn off "Always show remote images" in Appearance; the per-message
+"Show images" button returns for them.

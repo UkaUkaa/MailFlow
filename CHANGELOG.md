@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+- Remote images in emails are shown by default. Migration 0005 switches the setting on for
+  existing users; it can still be turned off in Settings → Appearance (D41).
+
 ### Added
 - CI (`.github/workflows/ci.yml`): backend ruff, mypy and pytest against the dev
   PostgreSQL/Redis/GreenMail services; frontend lint, typecheck, Vitest, build and Playwright
