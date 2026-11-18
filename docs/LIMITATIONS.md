@@ -117,7 +117,11 @@ Honest list of what is missing or partial. Update whenever something here change
   mark quotes with a class or a plain "On … wrote:" line are not detected (the sanitizer strips
   classes).
 - Search suggestions offer no operators (`from:`, `has:` …): the search API has none.
-- Avatars are initials on a colour; no pictures (Gravatar, provider photos) are loaded.
+- Sender avatars are initials on a colour; no pictures (Gravatar, provider photos) are loaded.
+  Only the user's own mailboxes can have a picture, uploaded by the user.
+- Account pictures are validated by file signature only; the server does not decode them. They
+  are shown only in `<img>` to their owner, so a malformed file can at worst fail to render.
+- The message-row wash is always on; there is no setting to turn it off.
 - Navigation: the language and theme rows show "Language: English" / "Theme: System" while their
   accessible names are "Switch language to …" / "Switch theme to …" (WCAG 2.5.3 is not met
   literally). When the column is collapsed and the window is short, the views and accounts

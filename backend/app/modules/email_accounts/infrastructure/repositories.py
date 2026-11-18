@@ -24,6 +24,7 @@ def _account(row: EmailAccountModel) -> EmailAccount:
         status=AccountStatus(row.status),
         status_reason=row.status_reason,
         created_at=row.created_at,
+        avatar_updated_at=row.avatar_updated_at,
     )
 
 
@@ -100,6 +101,38 @@ class SqlAccountRepository:
                 .where(EmailAccountModel.id == account_id, EmailAccountModel.user_id == user_id)
                 .values(**values)
             )
+
+    async def set_avatar(
+        self,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+        avatar: tuple[str, bytes] | None,
+        now: datetime,
+    ) -> None:
+        media_type, content = avatar if avatar else (None, None)
+        await self._db.execute(
+            update(EmailAccountModel)
+            .where(EmailAccountModel.id == account_id, EmailAccountModel.user_id == user_id)
+            .values(
+                avatar_image=content,
+                avatar_media_type=media_type,
+                avatar_updated_at=now if avatar else None,
+            )
+        )
+
+    async def get_avatar(
+        self, user_id: uuid.UUID, account_id: uuid.UUID
+    ) -> tuple[str, bytes] | None:
+        row = (
+            await self._db.execute(
+                select(EmailAccountModel.avatar_media_type, EmailAccountModel.avatar_image).where(
+                    EmailAccountModel.id == account_id, EmailAccountModel.user_id == user_id
+                )
+            )
+        ).one_or_none()
+        if row is None or row.avatar_media_type is None or row.avatar_image is None:
+            return None
+        return row.avatar_media_type, row.avatar_image
 
     async def set_status(
         self, user_id: uuid.UUID, account_id: uuid.UUID, status: AccountStatus, reason: str | None

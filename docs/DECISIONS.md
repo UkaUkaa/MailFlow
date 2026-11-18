@@ -214,3 +214,20 @@ asserted per icon in `e2e/layout.spec.ts`. Consequences:
 - The language and theme rows keep their accessible names ("Switch language to …") while the
   visible label names the current value ("Language: English"), as required for a stable name in
   both states. This does not satisfy WCAG 2.5.3 (label in name) literally; see LIMITATIONS.
+
+## D36 — Any account colour, an optional picture, and a colour wash on message rows
+Users pick any RGB colour for a mailbox and may add a small picture; every row of the thread list
+is tinted with the mailbox colour.
+- **Colours are stored as `#rrggbb`.** The API used to accept only eight names (`blue`, …) while
+  the UI sent hex values, so saving a colour failed with 422. Migration 0002 maps the names to the
+  hex values the UI already showed and adds a check constraint.
+- **The picture lives in `email_accounts`** (a deferred `bytea` column) rather than a new table:
+  it is one small value per account, is deleted with the account, and needs no extra RLS policy.
+  It is never loaded with the account list; `avatar_updated_at` versions its URL so it can be
+  cached as immutable.
+- **No image library on the server.** The browser crops and re-encodes; the server enforces size
+  and recognises PNG / JPEG / WebP from the bytes, and serves with `nosniff` and a sandbox CSP.
+  Decoding untrusted images on the server would add attack surface for no gain in this use.
+- **The wash is a small share of the colour mixed into the surface** (OKLab `color-mix`), not
+  an opacity overlay, so text keeps its colour and contrast is predictable; the shares are theme
+  tokens. The selected row keeps the accent fill so the open conversation stays obvious.

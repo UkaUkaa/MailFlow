@@ -90,11 +90,35 @@ export function useUpdateAccount() {
   return useMutation({
     mutationFn: ({ accountId, ...body }: { accountId: string; display_name?: string; color?: string }) =>
       api.patch(`/accounts/${encodeURIComponent(accountId)}`, accountSchema, body),
-    onSuccess: (updated) => {
-      queryClient.setQueryData<Account[]>(accountKeys.list(), (current) =>
-        current?.map((account) => (account.id === updated.id ? updated : account)),
-      );
+    onSuccess: (updated) => replaceCachedAccount(queryClient, updated),
+  });
+}
+
+function replaceCachedAccount(queryClient: ReturnType<typeof useQueryClient>, updated: Account) {
+  queryClient.setQueryData<Account[]>(accountKeys.list(), (current) =>
+    current?.map((account) => (account.id === updated.id ? updated : account)),
+  );
+}
+
+/** Sets the mailbox picture. The blob is the already cropped and scaled image. */
+export function useSetAccountAvatar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ accountId, image }: { accountId: string; image: Blob }) => {
+      const form = new FormData();
+      form.append("file", image, image.type === "image/png" ? "avatar.png" : "avatar.webp");
+      return api.put(`/accounts/${encodeURIComponent(accountId)}/avatar`, accountSchema, form);
     },
+    onSuccess: (updated) => replaceCachedAccount(queryClient, updated),
+  });
+}
+
+export function useRemoveAccountAvatar() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (accountId: string) =>
+      api.delete(`/accounts/${encodeURIComponent(accountId)}/avatar`).then(() => accountId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: accountKeys.list() }),
   });
 }
 

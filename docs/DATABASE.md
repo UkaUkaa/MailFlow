@@ -19,7 +19,7 @@ PostgreSQL 17. Schema is managed by Alembic (`backend/migrations`). UUID primary
 | `email_verification_tokens`, `password_reset_tokens` | authentication | no | hashed, single-use |
 | `audit_events` | audit | no | no FK to users by design |
 | `user_settings` | settings | yes | PK = `user_id` |
-| `email_accounts` | email_accounts | yes | unique `(user_id, provider, email_address)`; unique `(id, user_id)` |
+| `email_accounts` | email_accounts | yes | unique `(user_id, provider, email_address)`; unique `(id, user_id)`; `color` checked to be `#rrggbb`; optional picture in `avatar_image` (deferred: never loaded with the list) + `avatar_media_type` + `avatar_updated_at` |
 | `oauth_states` | email_accounts | yes | hashed state, encrypted PKCE verifier |
 | `account_credentials` | token_vault | yes | `key_id`, `nonce`, `ciphertext`; unique `(account_id, kind)` |
 | `sync_states` | synchronization | yes | one per account; cursor, backfill token, `next_sync_at` |

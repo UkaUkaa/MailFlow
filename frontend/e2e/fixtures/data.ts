@@ -24,6 +24,7 @@ export interface AccountFixture {
   email_address: string;
   display_name: string | null;
   color: string | null;
+  avatar_updated_at?: string | null;
   status: string;
   status_reason: string | null;
   capabilities: typeof capabilities;

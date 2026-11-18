@@ -98,7 +98,13 @@ Layout, sizes and states: `docs/architecture/DESIGN_SYSTEM.md` and
   derived from the address), sender / date, subject + message-count chip + attachment mark, one
   preview line, and the star. Quick actions (read/unread, archive when the mailbox supports it,
   trash) take the avatar's place on hover and on keyboard focus and call the same optimistic
-  actions as the reader.
+  actions as the reader. Every row is washed with its mailbox colour (`.account-tint`, see
+  DESIGN_SYSTEM.md); the mailbox picture, when set, replaces the colour dot.
+- **Account appearance** (`modules/accounts`, Settings → Connected accounts → Edit) — presets,
+  any RGB colour (`<input type="color">`) and a hex field, plus a picture (PNG/JPEG/WebP). The
+  picture is cropped to a centred square and re-encoded to 96×96 WebP (PNG where WebP encoding is
+  unavailable) in the browser (`lib/avatar.ts`); its average colour is offered as the account
+  colour. A preview row shows the wash before saving.
 - **Reader** (`modules/emails`) — toolbar: a two-segment pill (back to the list; archive, only
   when `isActionAvailable("archive")`), then trash, mark unread, star, spam (tablet and wider) and
   the "More actions" menu. Each message is a card; a stored draft in a conversation is a compact

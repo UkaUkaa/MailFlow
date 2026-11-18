@@ -42,6 +42,8 @@ Update this file whenever an item changes state.
 - [x] Playwright viewport matrix (15 sizes + landscape, both locales) with screenshot review
 - [x] Layout reworked after `docs/design/SPARK_REFERENCE.md`: rail that expands in place, date-grouped list,
       message cards, page / docked composer, search mode, settings dialog (Chromium only)
+- [x] Account appearance: any RGB colour, optional picture, colour wash on message rows
+      (backend + unit/integration/e2e; screenshots at 375, 820, 1440 px, both themes and locales)
 - [~] Mail screens are verified with mocked API data; against the real backend only the
       no-mailbox states were exercised (no Google credentials available)
 - [~] Virtual keyboard and safe areas verified by viewport emulation, not on physical devices

@@ -67,8 +67,17 @@ Rules that follow from the numbers:
 - Text on `--rail` (row labels, section headings) uses `--foreground-muted` or stronger;
   `--foreground-subtle` would be 4.4:1 there in the light theme.
 
-Account colours (identification dots): a fixed set of eight hues, chosen per account
-(`shared/constants/account-colors.ts`). Avatar discs use the same hues 15% darker
+Account colours: any `#rrggbb` per account, picked from eight preset hues
+(`shared/constants/account-colors.ts`), the platform's RGB picker or a typed hex code. A mailbox
+may also have a picture, shown instead of the dot (16px in lists, 36px in settings).
+
+Message-row wash (`.account-tint` in `globals.css`): each row in the thread list mixes the
+mailbox colour into `--surface` — 7% at rest and 12% on hover in the light theme, 10% / 14% in
+the dark theme (`--account-tint-rest`, `--account-tint-hover`), in OKLab so hues look equally
+strong. Neighbouring rows are separated by a 1px line of plain surface; the selected row keeps
+`--accent-soft`. Dates on a tinted row use `--foreground-muted`, which stays at or above 4.5:1
+on the strongest wash for the presets and for pure white, black, yellow, red and cyan in both
+themes (unit-tested). Avatar discs use the same hues 15% darker
 (`AVATAR_COLORS`), picked deterministically from the sender's address; white initials reach at
 least 5.1:1 on every one (unit-tested). No avatar picture is ever fetched.
 

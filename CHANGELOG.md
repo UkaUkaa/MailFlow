@@ -3,6 +3,19 @@
 ## [Unreleased]
 
 ### Added
+- Account appearance: any RGB colour per mailbox (presets, the platform colour picker or a hex
+  code) and an optional picture (PNG/JPEG/WebP, cropped and re-encoded to 96×96 in the browser;
+  its average colour is suggested). `PUT`/`DELETE`/`GET /accounts/{id}/avatar`,
+  `Account.avatar_updated_at`. The picture replaces the colour dot in the list, the reader, the
+  account switcher and settings.
+- Message rows in the thread list are washed with their mailbox colour (theme tokens
+  `--account-tint-rest` / `--account-tint-hover`), with a preview in the edit dialog.
+
+### Fixed
+- Saving an account colour failed with 422: the UI sent hex values, the API accepted only colour
+  names. Colours are now `#rrggbb` throughout (migration `0002` converts stored names).
+
+### Added
 - Architecture, security, data-ownership, provider, responsive and design-system documentation;
   `AGENTS.md`, `CLAUDE.md`, agent definitions.
 - Backend (FastAPI modular monolith): authentication (registration, verification, login, logout,

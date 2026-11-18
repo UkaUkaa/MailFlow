@@ -7,12 +7,15 @@ export {
   useStartOAuth,
   useReconnectAccount,
   useUpdateAccount,
+  useSetAccountAvatar,
+  useRemoveAccountAvatar,
   useDisconnectAccount,
   useSyncStatus,
   useSyncNow,
 } from "./api";
 export { accountsSupport, anyAccountSupports } from "./lib/capabilities";
 export type { CapabilityName } from "./lib/capabilities";
+export { accountAvatarUrl } from "./lib/avatar";
 export { useAccountFilter } from "./hooks/use-account-filter";
 export { AccountDot } from "./components/account-dot";
 export { AccountSwitcher } from "./components/account-switcher";

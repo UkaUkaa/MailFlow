@@ -13,19 +13,24 @@ import { ResponsiveMenu, type MenuItem } from "@/shared/components/layout/respon
 import { Button } from "@/shared/components/ui/button";
 import { Field } from "@/shared/components/ui/field";
 import { Input } from "@/shared/components/ui/input";
-import { ACCOUNT_COLORS, DEFAULT_ACCOUNT_COLOR } from "@/shared/constants/account-colors";
+import { DEFAULT_ACCOUNT_COLOR, normalizeHexColor } from "@/shared/constants/account-colors";
+import { isApiError } from "@/infrastructure/api-client";
 import { cn } from "@/shared/lib/cn";
 import { formatFullDate } from "@/shared/utils/format";
 import {
   useAccounts,
   useDisconnectAccount,
   useReconnectAccount,
+  useRemoveAccountAvatar,
+  useSetAccountAvatar,
   useSyncNow,
   useUpdateAccount,
 } from "../api";
+import { accountAvatarUrl } from "../lib/avatar";
 import { accountLabel, type Account } from "../types";
 import { isPasswordProvider, providerLabelKey } from "../lib/providers";
 import { AccountDot } from "./account-dot";
+import { AppearancePicker, type AvatarChange } from "./appearance-picker";
 import { ConnectSection } from "./connect-section";
 import { ImapReconnectDialog } from "./imap-reconnect-dialog";
 
@@ -51,20 +56,37 @@ function EditAccountDialog({ account, onClose }: { account: Account; onClose: ()
   const t = useTranslations("accounts");
   const tc = useTranslations("common");
   const update = useUpdateAccount();
+  const setAvatar = useSetAccountAvatar();
+  const removeAvatar = useRemoveAccountAvatar();
   const [name, setName] = useState(account.display_name ?? "");
-  const [color, setColor] = useState(account.color ?? DEFAULT_ACCOUNT_COLOR);
+  const [color, setColor] = useState(normalizeHexColor(account.color ?? "") ?? DEFAULT_ACCOUNT_COLOR);
+  const [avatar, setAvatarChange] = useState<AvatarChange>({ kind: "keep" });
+  const [saving, setSaving] = useState(false);
 
-  const save = () => {
-    update.mutate(
-      { accountId: account.id, display_name: name.trim(), color },
-      {
-        onSuccess: () => {
-          toast.success(t("updated"));
-          onClose();
-        },
-        onError: () => toast.error(tc("genericError")),
-      },
-    );
+  // The preview of a newly chosen picture is an object URL; release it once it is replaced.
+  const previewUrl = avatar.kind === "new" ? avatar.prepared.previewUrl : null;
+  useEffect(() => (previewUrl ? () => URL.revokeObjectURL(previewUrl) : undefined), [previewUrl]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await update.mutateAsync({ accountId: account.id, display_name: name.trim() || undefined, color });
+    } catch {
+      toast.error(tc("genericError"));
+      setSaving(false);
+      return;
+    }
+    try {
+      if (avatar.kind === "new") await setAvatar.mutateAsync({ accountId: account.id, image: avatar.prepared.blob });
+      else if (avatar.kind === "remove") await removeAvatar.mutateAsync(account.id);
+    } catch (error) {
+      const reason = isApiError(error) && error.status === 413 ? "pictureTooLarge" : isApiError(error) && error.status === 422 ? "pictureUnsupported" : "pictureFailed";
+      toast.error(t(reason));
+      setSaving(false);
+      return;
+    }
+    toast.success(t("updated"));
+    onClose();
   };
 
   return (
@@ -77,7 +99,7 @@ function EditAccountDialog({ account, onClose }: { account: Account; onClose: ()
       footer={
         <>
           <Button onClick={onClose}>{tc("cancel")}</Button>
-          <Button variant="primary" loading={update.isPending} onClick={save}>
+          <Button variant="primary" loading={saving} onClick={() => void save()}>
             {tc("save")}
           </Button>
         </>
@@ -87,29 +109,14 @@ function EditAccountDialog({ account, onClose }: { account: Account; onClose: ()
         <Field label={t("displayName")} htmlFor="account-name" hint={t("displayNameHint")}>
           <Input id="account-name" value={name} maxLength={80} onChange={(event) => setName(event.target.value)} />
         </Field>
-        <fieldset className="flex flex-col gap-2">
-          <legend className="mb-2 text-[13px] font-medium text-foreground">{t("color")}</legend>
-          <div className="flex flex-wrap gap-1">
-            {ACCOUNT_COLORS.map((value, index) => (
-              <button
-                key={value}
-                type="button"
-                aria-label={t("colorOption", { index: index + 1 })}
-                aria-pressed={color === value}
-                onClick={() => setColor(value)}
-                className="inline-flex size-11 items-center justify-center rounded-md hover:bg-muted"
-              >
-                <span
-                  className={cn(
-                    "size-6 rounded-full ring-offset-2 ring-offset-surface-raised",
-                    color === value && "ring-2 ring-foreground",
-                  )}
-                  style={{ backgroundColor: value }}
-                />
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        <AppearancePicker
+          color={color}
+          onColorChange={setColor}
+          currentImageUrl={accountAvatarUrl(account)}
+          avatar={avatar}
+          onAvatarChange={setAvatarChange}
+          previewLabel={name.trim() || account.email_address}
+        />
       </div>
     </ResponsiveDialog>
   );
@@ -164,8 +171,8 @@ function AccountRow({ account }: { account: Account }) {
   return (
     <li className="flex min-w-0 flex-col gap-3 p-4">
       <div className="flex min-w-0 items-start gap-3">
-        <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-surface">
-          <AccountDot color={account.color} className="size-3" />
+        <span className="mt-0.5 inline-flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md border border-border bg-surface">
+          <AccountDot color={account.color} imageUrl={accountAvatarUrl(account)} className="size-3" imageClassName="size-full rounded-none" />
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">

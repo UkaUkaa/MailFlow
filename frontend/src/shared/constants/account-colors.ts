@@ -1,4 +1,7 @@
-/** Fixed identification hues for connected accounts (DESIGN_SYSTEM.md). */
+/**
+ * Default identification hues for connected accounts (DESIGN_SYSTEM.md), offered as presets.
+ * The user may pick any other colour; the backend hands these out in turn to new mailboxes.
+ */
 export const ACCOUNT_COLORS = [
   "#3355e0",
   "#0e8f8f",
@@ -11,6 +14,13 @@ export const ACCOUNT_COLORS = [
 ] as const;
 
 export const DEFAULT_ACCOUNT_COLOR = ACCOUNT_COLORS[0];
+
+/** `#rrggbb` in lower case (also accepts `rrggbb` and `#rgb`), or `null` for anything else. */
+export function normalizeHexColor(value: string): string | null {
+  const raw = value.trim().toLowerCase().replace(/^#/, "");
+  if (/^[0-9a-f]{3}$/.test(raw)) return `#${[...raw].map((char) => char + char).join("")}`;
+  return /^[0-9a-f]{6}$/.test(raw) ? `#${raw}` : null;
+}
 
 /**
  * The same eight hues, 15% darker, for avatar discs: white initials reach at least 5:1 on each.

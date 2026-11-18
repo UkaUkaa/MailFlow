@@ -264,7 +264,7 @@ async def test_account_limit_is_checked_before_probing(
                 text(
                     "INSERT INTO email_accounts"
                     " (id, user_id, provider, email_address, display_name, color, status)"
-                    " VALUES (:id, :user, 'gmail', :email, 'x', 'blue', 'active')"
+                    " VALUES (:id, :user, 'gmail', :email, 'x', '#3355e0', 'active')"
                 ),
                 {"id": uuid.uuid4(), "user": alice.user_id, "email": f"m{i}@example.org"},
             )

@@ -4,7 +4,7 @@ import { ArrowLeft, Filter, Inbox, Menu, Search as SearchIcon, SearchX, SquarePe
 import { useParams, useSearchParams } from "next/navigation";
 import { useLocale, useTranslations } from "next-intl";
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ConnectAccountPrompt, SyncButton, accountLabel, useAccounts } from "@/modules/accounts";
+import { ConnectAccountPrompt, SyncButton, accountAvatarUrl, accountLabel, useAccounts } from "@/modules/accounts";
 import { useComposer } from "@/modules/composer";
 import { isActionAvailable, useThreadActions, useThreadList, type ThreadAction, type ThreadListFilter } from "@/modules/emails";
 import { parseMailView, useFolders } from "@/modules/folders";
@@ -89,8 +89,11 @@ export function ThreadList({ scope }: { scope?: MailListScope }) {
   const onAction = useCallback((action: ThreadAction, threadId: string) => run(action, [threadId]), [run]);
 
   const threads = useMemo(() => list.data?.pages.flatMap((page) => page.items) ?? [], [list.data]);
-  const colorByAccount = useMemo(
-    () => new Map((accounts.data ?? []).map((item) => [item.id, item.color])),
+  const appearanceByAccount = useMemo(
+    () =>
+      new Map(
+        (accounts.data ?? []).map((item) => [item.id, { color: item.color, imageUrl: accountAvatarUrl(item) }]),
+      ),
     [accounts.data],
   );
 
@@ -239,7 +242,8 @@ export function ThreadList({ scope }: { scope?: MailListScope }) {
                     href={`/mail/${view.slug}/${thread.id}${suffix}`}
                     selected={!scope && params.threadId === thread.id}
                     view={filter.view}
-                    accountColor={colorByAccount.get(thread.account_id)}
+                    accountColor={appearanceByAccount.get(thread.account_id)?.color}
+                    accountImageUrl={appearanceByAccount.get(thread.account_id)?.imageUrl}
                     showAccount={!accountId && (accounts.data?.length ?? 0) > 1}
                     canArchive={isActionAvailable("archive", accounts.data, [thread.account_id])}
                     onAction={onAction}

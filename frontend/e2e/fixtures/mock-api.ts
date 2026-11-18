@@ -1,4 +1,5 @@
 import type { Page, Request, Route } from "@playwright/test";
+import { samplePng } from "./png";
 import { accounts, imapAccount, type AccountFixture, folderCounts, folders, makeThreadDetail, makeThreads, sessions, settings, user, type ThreadFixture } from "./data";
 
 export interface MockOptions {
@@ -53,6 +54,9 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
     authedCalls: 0,
   };
   const calls: RecordedCall[] = [];
+  // Accounts with a picture. Every picture is served as the same generated PNG; tests assert on
+  // the upload request itself.
+  const avatars = new Set(state.accounts.filter((account) => account.avatar_updated_at).map((account) => account.id));
 
   const handler = async (route: Route, request: Request) => {
     const url = new URL(request.url());
@@ -144,6 +148,24 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
       if (body.password === REJECTED_MAIL_PASSWORD) return mailServerError(route, "authentication_failed", "imap");
       Object.assign(account, { status: "active", status_reason: null });
       account.sync = { ...account.sync, status: "idle", last_error_code: null };
+      return json(route, 200, account);
+    }
+    const avatar = /^\/accounts\/([^/]+)\/avatar$/.exec(path);
+    if (avatar) {
+      const account = state.accounts.find((item) => item.id === avatar[1]);
+      if (!account) return error(route, 404, "not_found");
+      if (method === "GET") {
+        return avatars.has(account.id)
+          ? route.fulfill({ status: 200, contentType: "image/png", body: samplePng(96, [214, 120, 60]) })
+          : error(route, 404, "not_found");
+      }
+      if (method === "PUT") {
+        avatars.add(account.id);
+        account.avatar_updated_at = new Date().toISOString();
+      } else if (method === "DELETE") {
+        avatars.delete(account.id);
+        account.avatar_updated_at = null;
+      }
       return json(route, 200, account);
     }
     if (path.startsWith("/accounts/")) {

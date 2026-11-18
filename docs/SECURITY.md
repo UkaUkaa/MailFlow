@@ -103,6 +103,11 @@ connection reuse, concurrent transactions and requests).
   stripped of paths, control characters and reserved names; MIME types are validated. Downloads
   are always `application/octet-stream` with `Content-Disposition: attachment`, `nosniff` and a
   sandbox CSP. Limits: 25 MB and 20 files per message.
+- Account pictures (`PUT /accounts/{id}/avatar`): at most 128 KB; the type is recognised from the
+  file's signature and only PNG, JPEG and WebP are kept (SVG and GIF are refused), so nothing
+  scriptable is stored. The browser re-encodes the image to 96×96 before upload, which also drops
+  EXIF metadata such as location. They are served only to their owner, with the recognised type,
+  `nosniff` and `sandbox; default-src 'none'`, and shown only in `<img>`.
 - **Malware scanning is not implemented.** Production must add scanning (for example ClamAV) for
   uploads and downloads or clearly warn users.
 

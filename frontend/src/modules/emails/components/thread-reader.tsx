@@ -20,7 +20,7 @@ import {
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { useEffect, useRef } from "react";
-import { AccountDot, useAccounts } from "@/modules/accounts";
+import { AccountDot, accountAvatarUrl, useAccounts } from "@/modules/accounts";
 import { useComposer } from "@/modules/composer";
 import { useSettings } from "@/modules/settings";
 import { isApiError } from "@/infrastructure/api-client";
@@ -129,7 +129,7 @@ function ThreadBody({ thread, unified, onEmptied }: { thread: ThreadDetail; unif
           </h1>
           {unified && account ? (
             <p className="mt-1.5 flex min-w-0 items-center gap-1.5 px-1 text-xs text-foreground-muted">
-              <AccountDot color={account.color} />
+              <AccountDot color={account.color} imageUrl={accountAvatarUrl(account)} />
               <span className="truncate">{account.email_address}</span>
             </p>
           ) : null}

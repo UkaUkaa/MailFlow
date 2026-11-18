@@ -12,6 +12,7 @@ import { useAccounts } from "../api";
 import { useAccountFilter } from "../hooks/use-account-filter";
 import { providerLabelKey } from "../lib/providers";
 import { accountLabel } from "../types";
+import { accountAvatarUrl } from "../lib/avatar";
 import { AccountDot } from "./account-dot";
 
 /**
@@ -70,7 +71,7 @@ export function AccountSwitcher({ onNavigate, expanded = true }: { onNavigate?: 
                 className={navRow}
               >
                 <span className={navIcon}>
-                  <AccountDot color={account.color} className="size-2.5" />
+                  <AccountDot color={account.color} imageUrl={accountAvatarUrl(account)} className="size-2.5" />
                   {account.status !== "active" ? (
                     <span aria-hidden className="mf-nav-rail-only absolute top-0.5 right-0.5 size-2 rounded-full border-2 border-rail bg-warning touch:top-2 touch:right-2" />
                   ) : null}

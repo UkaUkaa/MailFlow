@@ -2,7 +2,7 @@
 
 import { Archive, Mail, MailOpen, Paperclip, Pencil, Star, Trash2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { memo, useState, type FocusEvent } from "react";
+import { memo, useState, type CSSProperties, type FocusEvent } from "react";
 import { AccountDot } from "@/modules/accounts";
 import type { ThreadAction, ThreadSummary } from "@/modules/emails";
 import { Link } from "@/infrastructure/i18n/navigation";
@@ -24,6 +24,7 @@ interface ThreadRowProps {
   selected: boolean;
   view: string;
   accountColor: string | null | undefined;
+  accountImageUrl?: string | null;
   showAccount: boolean;
   /** Whether the thread's mailbox can archive; the quick action is left out when it cannot. */
   canArchive: boolean;
@@ -66,6 +67,7 @@ export const ThreadRow = memo(function ThreadRow({
   selected,
   view,
   accountColor,
+  accountImageUrl,
   showAccount,
   canArchive,
   onAction,
@@ -86,12 +88,17 @@ export const ThreadRow = memo(function ThreadRow({
     if (!event.currentTarget.contains(event.relatedTarget)) setKeyboardFocus(false);
   };
 
+  // The whole row carries a faint wash of its mailbox's colour (`.account-tint`, globals.css).
+  // Selection keeps its own fill so the open conversation is always unmistakable.
+  const tinted = Boolean(accountColor) && !selected;
+
   return (
     <li
       data-selected={selected}
       onFocus={onFocus}
       onBlur={onBlur}
-      className={cn("group relative", selected ? "bg-accent-soft" : "hover:bg-muted/60")}
+      style={tinted ? ({ "--account-tint": accountColor } as CSSProperties) : undefined}
+      className={cn("group relative", selected ? "bg-accent-soft" : tinted ? "account-tint" : "hover:bg-muted/60")}
     >
       <Link
         href={href}
@@ -121,7 +128,7 @@ export const ThreadRow = memo(function ThreadRow({
             </span>
             <time
               dateTime={thread.last_message_at}
-              className={cn("shrink-0 text-[11px] tabular-nums", selected ? "text-foreground-muted" : "text-foreground-subtle")}
+              className={cn("shrink-0 text-[11px] tabular-nums", selected || tinted ? "text-foreground-muted" : "text-foreground-subtle")}
             >
               {formatListDate(thread.last_message_at, locale)}
             </time>
@@ -144,7 +151,7 @@ export const ThreadRow = memo(function ThreadRow({
             <span className={cn("min-w-0 flex-1 truncate text-[13px] text-foreground-muted", !thread.snippet && "italic")}>
               {thread.snippet || t("noContent")}
             </span>
-            {showAccount ? <AccountDot color={accountColor} /> : null}
+            {showAccount ? <AccountDot color={accountColor} imageUrl={accountImageUrl} /> : null}
           </span>
         </span>
       </Link>

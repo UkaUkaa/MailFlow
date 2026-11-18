@@ -39,6 +39,9 @@
   /* Width of the navigation column: nothing on phones, the icon rail from md, the expanded menu. */
   --nav-width: 0px;
   --nav-offset: calc(var(--nav-width) + env(safe-area-inset-left, 0px));
+  /* Share of the mailbox colour mixed into a message row (`.account-tint`). */
+  --account-tint-rest: 7%;
+  --account-tint-hover: 12%;
 }
 
 @media (min-width: 48rem) {
@@ -88,6 +91,9 @@
   --overlay: rgb(0 0 0 / 0.6);
   --elev-sm: 0 1px 2px rgb(0 0 0 / 0.4), 0 4px 12px rgb(0 0 0 / 0.3);
   --elev-lg: 0 4px 10px rgb(0 0 0 / 0.4), 0 20px 48px rgb(0 0 0 / 0.5);
+  /* Dark surfaces need a little more of the colour for the same perceived wash. */
+  --account-tint-rest: 10%;
+  --account-tint-hover: 14%;
 }
 
 @theme inline {
@@ -281,4 +287,22 @@
   float: left;
   height: 0;
   pointer-events: none;
+}
+
+/*
+ * Mailbox colour wash for message rows and their preview: a small share of the account colour
+ * (`--account-tint`, set inline) mixed into the list surface, so rows are told apart at a glance
+ * without competing with the text. A hairline of plain surface separates neighbouring rows of the
+ * same mailbox. Text on it keeps AA contrast (DESIGN_SYSTEM.md).
+ */
+@layer components {
+  .account-tint {
+    background-color: color-mix(in oklab, var(--account-tint) var(--account-tint-rest), var(--surface));
+    box-shadow: inset 0 -1px 0 var(--surface);
+  }
+  @media (hover: hover) {
+    .account-tint:hover {
+      background-color: color-mix(in oklab, var(--account-tint) var(--account-tint-hover), var(--surface));
+    }
+  }
 }

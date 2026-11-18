@@ -185,11 +185,14 @@ async def test_reconnect_requires_same_mailbox(alice, registry, runtime):
 async def test_update_and_disconnect_account(alice, registry, owner_engine):
     account_id = await connect_mailbox(alice, registry, "one@example.org")
     updated = await alice.client.patch(
-        f"/api/v1/accounts/{account_id}", json={"display_name": "Work", "color": "green"}
+        f"/api/v1/accounts/{account_id}", json={"display_name": "Work", "color": "#1F8A4C"}
     )
-    assert updated.json()["display_name"] == "Work" and updated.json()["color"] == "green"
-    bad = await alice.client.patch(f"/api/v1/accounts/{account_id}", json={"color": "neon"})
-    assert bad.status_code == 422
+    assert updated.json()["display_name"] == "Work" and updated.json()["color"] == "#1f8a4c"
+    for bad_color in ("neon", "green", "#fff", "#12345g", "rgb(1,2,3)"):
+        bad = await alice.client.patch(
+            f"/api/v1/accounts/{account_id}", json={"color": bad_color}
+        )
+        assert bad.status_code == 422, bad_color
     assert (await alice.client.delete(f"/api/v1/accounts/{account_id}")).status_code == 204
     assert registry.revoked == ["rt:one@example.org"]
     async with owner_engine.connect() as conn:
@@ -221,3 +224,51 @@ async def test_manual_sync_request(alice, registry, queue):
     assert status[0]["status"] == "queued" and status[0]["initial_sync_complete"] is False
     missing = await alice.client.post(f"/api/v1/sync/accounts/{uuid.uuid4()}")
     assert missing.status_code == 404
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 64
+WEBP = b"RIFF\x10\x00\x00\x00WEBPVP8 " + b"\x00" * 32
+
+
+async def test_new_accounts_get_hex_colours(alice, registry):
+    await connect_mailbox(alice, registry, "one@example.org")
+    account = (await alice.client.get("/api/v1/accounts")).json()["items"][0]
+    assert account["color"].startswith("#") and len(account["color"]) == 7
+    assert account["avatar_updated_at"] is None
+
+
+async def test_account_avatar_upload_serve_and_remove(alice, registry):
+    account_id = await connect_mailbox(alice, registry, "one@example.org")
+    url = f"/api/v1/accounts/{account_id}/avatar"
+    assert (await alice.client.get(url)).status_code == 404
+
+    # The declared type is ignored: the bytes decide.
+    uploaded = await alice.client.put(url, files={"file": ("me.txt", PNG, "text/plain")})
+    assert uploaded.status_code == 200, uploaded.text
+    assert uploaded.json()["avatar_updated_at"] is not None
+    served = await alice.client.get(url)
+    assert served.status_code == 200 and served.content == PNG
+    assert served.headers["content-type"] == "image/png"
+    assert served.headers["x-content-type-options"] == "nosniff"
+    assert "sandbox" in served.headers["content-security-policy"]
+
+    replaced = await alice.client.put(url, files={"file": ("a.webp", WEBP, "image/webp")})
+    assert replaced.status_code == 200
+    assert (await alice.client.get(url)).headers["content-type"] == "image/webp"
+
+    removed = await alice.client.delete(url)
+    assert removed.status_code == 200 and removed.json()["avatar_updated_at"] is None
+    assert (await alice.client.get(url)).status_code == 404
+
+
+async def test_account_avatar_rejects_unsafe_or_large_files(alice, registry):
+    account_id = await connect_mailbox(alice, registry, "one@example.org")
+    url = f"/api/v1/accounts/{account_id}/avatar"
+    svg = b'<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'
+    for content in (svg, b"GIF89a" + b"\x00" * 16, b"", b"RIFF\x00\x00\x00\x00AVI "):
+        response = await alice.client.put(url, files={"file": ("x.png", content, "image/png")})
+        assert response.status_code == 422, content[:8]
+    big = PNG + b"\x00" * (128 * 1024)
+    response = await alice.client.put(url, files={"file": ("big.png", big, "image/png")})
+    assert response.status_code == 413
+    assert (await alice.client.get(url)).status_code == 404
