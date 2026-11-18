@@ -3,6 +3,10 @@
 ## [Unreleased]
 
 ### Added
+- AI pull-request review (`.github/workflows/ai-pr-review.yml`): on every non-draft PR an AI
+  agent (Claude Sonnet 5.5 via `anthropics/claude-code-action`) scores the code 1-10, writes a short code
+  review in Russian and lists recommendations only when they matter. One comment per PR,
+  updated on each push. Needs the `ANTHROPIC_API_KEY` repository secret; fork PRs are skipped.
 - Progress for thread actions: while an action (single or bulk) waits for the server, a centred
   card with a spinner names it and its count ("Moving 3 conversations to trash…") and blocks
   the rest of the app (modal: pointer, keyboard and Escape) until the server answers. It fades
