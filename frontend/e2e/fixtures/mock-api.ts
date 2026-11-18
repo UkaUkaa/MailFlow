@@ -405,6 +405,15 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
         body_html: `<p>Hi Daniel,</p><p>${body.instruction ? "Thursday works for me." : "Thanks for the update."}</p><p>Best,<br>Sasha</p>`,
       });
     }
+    if (path === "/assistant/compose") {
+      if (!state.assistant.configured) return error(route, 409, "assistant_not_configured");
+      const body = request.postDataJSON() as { subject: string };
+      return json(route, 200, {
+        language: "en",
+        subject: body.subject ? "" : "March report",
+        body_html: "<p>Hi Daniel,</p><p>Could you send the March report by Friday?</p><p>Best,<br>Olena</p>",
+      });
+    }
     if (path === "/templates") {
       if (method === "POST") {
         const body = request.postDataJSON() as Omit<TemplateFixture, "id" | "created_at" | "updated_at">;

@@ -6,22 +6,23 @@ import { useId, useState, type KeyboardEvent } from "react";
 import { Link } from "@/infrastructure/i18n/navigation";
 import { Button } from "@/shared/components/ui/button";
 import { Textarea } from "@/shared/components/ui/input";
-import { useAssistant, useDraftReply } from "../api";
+import { useAssistant, useDraft } from "../api";
 import { assistantErrorKey, languageName, type AssistantErrorKey } from "../lib/errors";
-import { ASSISTANT_INSTRUCTION_MAX } from "../types";
+import { ASSISTANT_INSTRUCTION_MAX, type DraftTarget, type MessageDraft } from "../types";
 
 /**
- * "Write with AI" inside the reply composer: a short note in, a full reply out, written by the
- * AI service the user connected with their own key. The draft replaces the editor's text (undo
- * brings it back); nothing is sent.
+ * "Write with AI" inside the composer: a short note in, a full email out, written by the AI
+ * service the user connected with their own key. Replies are written from the conversation; new
+ * emails and forwards from the note, as the mailbox they are sent from. The draft replaces the
+ * editor's text (undo brings it back); nothing is sent.
  */
-export function AiReplyBar({
-  sourceMessageId,
+export function AiDraftBar({
+  target,
   onDraft,
   onClose,
 }: {
-  sourceMessageId: string;
-  onDraft: (bodyHtml: string) => void;
+  target: DraftTarget;
+  onDraft: (draft: MessageDraft) => void;
   onClose: () => void;
 }) {
   const t = useTranslations("assistant.composer");
@@ -31,21 +32,24 @@ export function AiReplyBar({
   const locale = useLocale();
   const inputId = useId();
   const assistant = useAssistant();
-  const draft = useDraftReply();
+  const draft = useDraft();
   const [note, setNote] = useState("");
   const [language, setLanguage] = useState<string | null>(null);
   const [problem, setProblem] = useState<AssistantErrorKey | null>(null);
   const config = assistant.data;
+  // A new email is written as the mailbox it is sent from, so that has to be chosen first.
+  const needsAccount = target.kind === "message" && !target.accountId;
+  const variant = target.kind === "reply" ? "reply" : target.forwardedMessageId ? "forward" : "new";
 
   const write = () => {
-    if (draft.isPending) return;
+    if (draft.isPending || needsAccount) return;
     setProblem(null);
     draft.mutate(
-      { sourceMessageId, instruction: note.trim() },
+      { target, instruction: note.trim() },
       {
         onSuccess: (result) => {
           setLanguage(languageName(result.language, locale));
-          onDraft(result.body_html);
+          onDraft(result);
         },
         onError: (error) => setProblem(assistantErrorKey(error)),
       },
@@ -106,7 +110,7 @@ export function AiReplyBar({
         rows={2}
         value={note}
         maxLength={ASSISTANT_INSTRUCTION_MAX}
-        placeholder={t("placeholder")}
+        placeholder={t(`placeholder.${variant}`)}
         disabled={draft.isPending || !config}
         onChange={(event) => setNote(event.target.value)}
         onKeyDown={onKeyDown}
@@ -119,9 +123,15 @@ export function AiReplyBar({
       ) : null}
       <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
         <p aria-live="polite" className="min-w-0 flex-1 truncate text-xs text-foreground-muted">
-          {draft.isPending ? t("writing") : language ? t("writtenIn", { language }) : t("hint")}
+          {needsAccount
+            ? t("chooseAccount")
+            : draft.isPending
+              ? t(variant === "reply" ? "writing" : "writingEmail")
+              : language
+                ? t("writtenIn", { language })
+                : t("hint")}
         </p>
-        <Button size="sm" variant="primary" loading={draft.isPending} disabled={!config} onClick={write}>
+        <Button size="sm" variant="primary" loading={draft.isPending} disabled={!config || needsAccount} onClick={write}>
           <Sparkles aria-hidden />
           {language ? t("rewrite") : t("write")}
         </Button>

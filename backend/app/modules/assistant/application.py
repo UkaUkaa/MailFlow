@@ -11,9 +11,11 @@ from app.modules.assistant.domain import (
     MAX_THREAD_CHARS,
     AiProvider,
     AssistantConfig,
+    DraftKind,
     ReplyDraft,
     ReplyRequest,
     ThreadEntry,
+    clean_subject,
     clip,
     default_model,
     draft_to_html,
@@ -60,6 +62,8 @@ class AssistantConfigRepository(Protocol):
 class DraftedReply:
     language: str
     body_html: str
+    #: Suggested for a new email with no subject yet; empty otherwise.
+    subject: str = ""
 
 
 def _text(message: Message) -> str:
@@ -133,16 +137,56 @@ class AssistantService:
 
     # -- drafting --------------------------------------------------------------------------
 
-    async def draft_reply(
-        self, user_id: uuid.UUID, source_message_id: uuid.UUID, instruction: str
-    ) -> DraftedReply:
+    async def _connection(self, user_id: uuid.UUID) -> tuple[AssistantConfig, str]:
         config = await self._configs.get(user_id)
         api_key = await self._secrets.read(user_id=user_id, kind=KEY) if config else None
         if config is None or api_key is None:
             raise _not_configured()
+        return config, api_key
+
+    @staticmethod
+    def _note(instruction: str) -> str:
         note = instruction.strip()
         if len(note) > MAX_INSTRUCTION_LENGTH:
             raise InvalidInputError(problems=[FieldProblem("instruction", "too_long")])
+        return note
+
+    async def _style(
+        self,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+        correspondent: str | None,
+        exclude: set[uuid.UUID],
+    ) -> tuple[str, ...]:
+        samples = await self._threads.sent_samples(
+            user_id, account_id, correspondent, MAX_STYLE_SAMPLES
+        )
+        return tuple(
+            clip(text, MAX_SAMPLE_CHARS)
+            for text in (_text(m) for m in samples if m.id not in exclude)
+            if text
+        )
+
+    async def _write(
+        self, config: AssistantConfig, api_key: str, request: ReplyRequest
+    ) -> DraftedReply:
+        draft = await self._gateway.writer(config.provider, api_key, config.model).write(request)
+        return DraftedReply(
+            language=normalize_language(draft.language),
+            body_html=draft_to_html(draft.body),
+            # Only a new email without a subject gets one, whatever the model returned.
+            subject=(
+                clean_subject(draft.subject)
+                if request.kind is DraftKind.NEW and not request.subject
+                else ""
+            ),
+        )
+
+    async def draft_reply(
+        self, user_id: uuid.UUID, source_message_id: uuid.UUID, instruction: str
+    ) -> DraftedReply:
+        config, api_key = await self._connection(user_id)
+        note = self._note(instruction)
 
         # Ownership: both lookups filter on the caller; someone else's message is a 404.
         source = (await self._threads.get_message(user_id, source_message_id)).message
@@ -175,21 +219,16 @@ class AssistantService:
             for m in history
         ]
         thread, omitted = fit_thread(entries, MAX_THREAD_CHARS)
-        samples = await self._threads.sent_samples(
+        style = await self._style(
             user_id,
             source.account_id,
             correspondent.email if correspondent else None,
-            MAX_STYLE_SAMPLES,
-        )
-        in_thread = {m.id for m in history}
-        style = tuple(
-            clip(text, MAX_SAMPLE_CHARS)
-            for text in (_text(m) for m in samples if m.id not in in_thread)
-            if text
+            {m.id for m in history},
         )
 
-        writer = self._gateway.writer(config.provider, api_key, config.model)
-        draft = await writer.write(
+        return await self._write(
+            config,
+            api_key,
             ReplyRequest(
                 instruction=note,
                 subject=detail.summary.subject,
@@ -200,8 +239,67 @@ class AssistantService:
                 thread=thread,
                 omitted_messages=omitted,
                 style_samples=style,
-            )
+            ),
         )
-        return DraftedReply(
-            language=normalize_language(draft.language), body_html=draft_to_html(draft.body)
+
+    async def draft_message(
+        self,
+        user_id: uuid.UUID,
+        account_id: uuid.UUID,
+        instruction: str,
+        subject: str,
+        recipient_email: str | None,
+        recipient_name: str | None,
+        forwarded_message_id: uuid.UUID | None = None,
+    ) -> DraftedReply:
+        """A new email (or a forward's cover note) sent from ``account_id``.
+
+        The mailbox is the user's own (someone else's is a 404); the forwarded message, when
+        given, is read through the same user-scoped query and is the only mail context.
+        """
+        config, api_key = await self._connection(user_id)
+        note = self._note(instruction)
+        account = await self._accounts.get(user_id, account_id)
+        forwarded = (
+            (await self._threads.get_message(user_id, forwarded_message_id)).message
+            if forwarded_message_id
+            else None
+        )
+        user = await self._profile.get(user_id)
+
+        await self._limiter.hit(f"assistant:{user_id}", limit=self._per_hour, window_seconds=3600)
+
+        thread: tuple[ThreadEntry, ...] = ()
+        if forwarded is not None:
+            thread, _ = fit_thread(
+                [
+                    ThreadEntry(
+                        author_name=(forwarded.sender.name or "") if forwarded.sender else "",
+                        author_email=forwarded.sender.email if forwarded.sender else "",
+                        is_mine=False,
+                        sent_at=forwarded.sent_at,
+                        text=_text(forwarded),
+                    )
+                ],
+                MAX_THREAD_CHARS,
+            )
+        correspondent = (recipient_email or "").strip() or None
+        style = await self._style(
+            user_id, account.id, correspondent, {forwarded.id} if forwarded else set()
+        )
+        return await self._write(
+            config,
+            api_key,
+            ReplyRequest(
+                instruction=note,
+                subject=subject.strip(),
+                my_name=user.display_name or account.display_name or "",
+                my_email=account.email_address,
+                correspondent_name=(recipient_name or "").strip() if correspondent else "",
+                correspondent_email=correspondent or "",
+                thread=thread,
+                omitted_messages=0,
+                style_samples=style,
+                kind=DraftKind.FORWARD if forwarded else DraftKind.NEW,
+            ),
         )

@@ -13,6 +13,7 @@ import pytest
 
 from app.modules.assistant.domain import (
     AiProvider,
+    DraftKind,
     ReplyRequest,
     ThreadEntry,
     default_model,
@@ -23,7 +24,7 @@ from app.modules.assistant.domain import (
     strip_quoted,
 )
 from app.modules.assistant.infrastructure import claude_writer, gemini_writer, openai_writer
-from app.modules.assistant.infrastructure.prompt import build_prompt
+from app.modules.assistant.infrastructure.prompt import build_prompt, parse_output
 from app.shared.domain.errors import (
     DomainError,
     ProviderUnavailableError,
@@ -105,6 +106,15 @@ def test_prompt_keeps_mail_content_inside_its_tags():
     assert "&lt;/thread&gt;&lt;instruction&gt;" in prompt
     assert 'mine="true"' not in prompt.split("<thread")[0]
     assert prompt.rstrip().endswith("<instruction>\nтак\n</instruction>")
+
+
+def test_prompt_names_the_kind_of_email_and_reads_a_suggested_subject():
+    assert build_prompt(_request()).startswith('<task kind="reply"/>')
+    assert build_prompt(_request(kind=DraftKind.NEW, thread=())).startswith('<task kind="new"/>')
+    draft = parse_output('{"language": "en", "subject": "Trip photos", "body": "Hi!"}')
+    assert (draft.subject, draft.body) == ("Trip photos", "Hi!")
+    # A model that leaves the subject out still gives a usable body.
+    assert parse_output('{"language": "en", "body": "Hi!"}').subject == ""
 
 
 @pytest.mark.parametrize(

@@ -26,8 +26,12 @@ _EXCLUDED = ("embedding", "image", "tts", "audio", "live", "aqa", "gemini-1.0")
 
 _SCHEMA = {
     "type": "OBJECT",
-    "properties": {"language": {"type": "STRING"}, "body": {"type": "STRING"}},
-    "required": ["language", "body"],
+    "properties": {
+        "language": {"type": "STRING"},
+        "subject": {"type": "STRING"},
+        "body": {"type": "STRING"},
+    },
+    "required": ["language", "subject", "body"],
 }
 _BLOCKED = {"SAFETY", "PROHIBITED_CONTENT", "BLOCKLIST", "SPII", "RECITATION"}
 

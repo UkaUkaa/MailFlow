@@ -379,6 +379,7 @@ class FakeAiGateway:
     rejected_keys: set[str] = field(default_factory=set)
     language: str = "uk"
     body: str = "Добрий день!\n\nДякую, підходить.\nДо зустрічі"
+    subject: str = ""
     listed: list[tuple[AiProvider, str]] = field(default_factory=list)
     writers: list[tuple[AiProvider, str, str]] = field(default_factory=list)
     requests: list[ReplyRequest] = field(default_factory=list)
@@ -400,4 +401,6 @@ class _FakeWriter:
 
     async def write(self, request: ReplyRequest) -> ReplyDraft:
         self.gateway.requests.append(request)
-        return ReplyDraft(language=self.gateway.language, body=self.gateway.body)
+        return ReplyDraft(
+            language=self.gateway.language, body=self.gateway.body, subject=self.gateway.subject
+        )

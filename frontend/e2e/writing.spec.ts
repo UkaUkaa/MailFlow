@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { accounts, imapAccount } from "./fixtures/data";
 import { mockApi } from "./fixtures/mock-api";
 
 const followUp = {
@@ -115,3 +116,60 @@ test("fits a 320 px phone in Ukrainian, light and dark", async ({ page }) => {
     await noHorizontalOverflow(page);
   }
 });
+
+// A long mailbox name and address must stay readable without pushing the composer sideways.
+// Two active mailboxes, so the sender is a picker.
+const longNamed = [
+  ...accounts.map((account, index) =>
+    index === 0
+      ? { ...account, display_name: "Olena Kovalenko — Personal mailbox for family and friends", email_address: "olena.kovalenko.personal.mailbox@example.com" }
+      : account,
+  ),
+  imapAccount,
+];
+
+for (const viewport of [
+  { name: "phone", width: 320, height: 640 },
+  { name: "tablet", width: 768, height: 1024 },
+  { name: "desktop", width: 1440, height: 900 },
+]) {
+  test(`new email: the sending mailbox is shown and AI writes it (${viewport.name})`, async ({ page }) => {
+    const api = await mockApi(page, { accounts: longNamed, aiProvider: "anthropic" });
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    for (const [locale, labels] of [
+      ["en", { compose: "Compose", title: "New message", from: "From", ai: "Write with AI", subject: "Subject", body: "Message" }],
+      ["uk", { compose: "Написати", title: "Новий лист", from: "Від", ai: "Написати з ШІ", subject: "Тема", body: "Текст листа" }],
+    ] as const) {
+      for (const scheme of ["light", "dark"] as const) {
+        await page.emulateMedia({ colorScheme: scheme });
+        await page.goto(`/${locale}/mail/inbox`);
+        await page.getByRole("button", { name: labels.compose, exact: true }).locator("visible=true").first().click();
+        const composer = page.getByRole("dialog", { name: labels.title });
+        const from = composer.getByRole("combobox", { name: labels.from });
+        await expect(from).toHaveValue("acc-1");
+        const address = composer.getByText("<olena.kovalenko.personal.mailbox@example.com>", { exact: true });
+        await expect(address).toBeVisible();
+        if (viewport.width >= 768) {
+          // The whole address fits; only the long name is shortened.
+          expect(await address.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+        }
+        await noHorizontalOverflow(page);
+
+        await composer.getByRole("button", { name: labels.ai }).locator("visible=true").first().click();
+        const note = composer.getByRole("textbox", { name: labels.ai });
+        await note.fill("ask Daniel for the March report");
+        await note.press("Enter");
+        await expect(composer.getByRole("textbox", { name: labels.body })).toContainText(
+          "Could you send the March report by Friday?",
+        );
+        await expect(composer.getByLabel(labels.subject, { exact: true })).toHaveValue("March report");
+        await noHorizontalOverflow(page);
+        // Close (the draft is saved) so the next round starts from a clean page.
+        await composer.getByRole("textbox", { name: labels.body }).press("Escape");
+        await expect(composer).toBeHidden();
+      }
+    }
+    const [first] = api.callsTo("POST", "/assistant/compose");
+    expect(JSON.parse(first?.body ?? "{}")).toMatchObject({ account_id: "acc-1", instruction: "ask Daniel for the March report", subject: "" });
+  });
+}

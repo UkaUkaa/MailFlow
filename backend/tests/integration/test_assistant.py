@@ -7,7 +7,7 @@ from dataclasses import replace
 from sqlalchemy import text
 
 from app.integrations.email_providers.contracts import Address, FolderRole
-from app.modules.assistant.domain import AiProvider
+from app.modules.assistant.domain import AiProvider, DraftKind
 from tests.conftest import connect_ai, connect_mailbox
 from tests.fakes import make_message
 
@@ -15,6 +15,7 @@ R = FolderRole
 MAILBOX = "a@example.org"
 ASSISTANT = "/api/v1/assistant"
 REPLY = "/api/v1/assistant/reply"
+COMPOSE = "/api/v1/assistant/compose"
 KEY = "sk-proj-SECRETVALUE-9876"
 
 
@@ -189,3 +190,81 @@ async def test_key_checks_are_rate_limited(alice, ai):
         for _ in range(11)
     ]
     assert codes == [422] * 10 + [429]
+
+
+async def _account_id(actor) -> str:
+    accounts = (await actor.client.get("/api/v1/accounts")).json()["items"]
+    return next(a["id"] for a in accounts if a["email_address"] == MAILBOX)
+
+
+async def test_drafts_a_new_email_from_the_chosen_mailbox(alice, registry, runner, ai):
+    await _conversation(alice, registry, runner)
+    account_id = await _account_id(alice)
+    await connect_ai(alice, "anthropic", KEY)
+    ai.subject = "  Фото\n з поїздки "
+    ai.body = "Привіт, Олено!\n\nНадсилаю фото.\nОбіймаю, Аліса"
+
+    response = await alice.client.post(
+        COMPOSE,
+        json={
+            "account_id": account_id,
+            "instruction": " send Olena the trip photos ",
+            "recipient_email": "olena@example.com",
+            "recipient_name": "Olena",
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json() == {
+        "language": "uk",
+        "subject": "Фото з поїздки",
+        "body_html": "<p>Привіт, Олено!</p><p>Надсилаю фото.<br>Обіймаю, Аліса</p>",
+    }
+    request = ai.requests[0]
+    assert request.kind is DraftKind.NEW
+    assert request.instruction == "send Olena the trip photos"
+    assert request.my_email == MAILBOX
+    assert request.correspondent_email == "olena@example.com"
+    assert request.thread == ()
+    assert request.style_samples  # the user's own sent mail to Olena
+
+    # A subject the user already typed is kept: none is suggested even if the model sends one.
+    typed = await alice.client.post(
+        COMPOSE, json={"account_id": account_id, "subject": "Photos", "instruction": "send them"}
+    )
+    assert typed.status_code == 200, typed.text
+    assert typed.json()["subject"] == ""
+
+
+async def test_forward_note_uses_the_forwarded_message_and_keeps_the_subject(
+    alice, registry, runner, ai
+):
+    source = await _conversation(alice, registry, runner)
+    await connect_ai(alice)
+    ai.subject = "should be ignored"
+    response = await alice.client.post(
+        COMPOSE,
+        json={
+            "account_id": await _account_id(alice),
+            "subject": "Fwd: Зустріч",
+            "forwarded_message_id": source,
+        },
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["subject"] == ""
+    (request,) = ai.requests
+    assert request.kind is DraftKind.FORWARD
+    assert [e.text for e in request.thread] == ["Привіт! Давай у четвер?"]
+
+
+async def test_new_email_drafting_stays_with_its_owner(alice, bob, registry, runner, ai):
+    source = await _conversation(alice, registry, runner)
+    account_id = await _account_id(alice)
+    await connect_ai(bob, "anthropic", "sk-ant-bob-key-5555")
+    bob_account = str(await connect_mailbox(bob, registry, "b@example.org"))
+    foreign_account = await bob.client.post(COMPOSE, json={"account_id": account_id})
+    assert foreign_account.status_code == 404
+    foreign_message = await bob.client.post(
+        COMPOSE, json={"account_id": bob_account, "forwarded_message_id": source}
+    )
+    assert foreign_message.status_code == 404
+    assert ai.requests == []

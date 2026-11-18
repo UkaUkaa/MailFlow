@@ -391,3 +391,23 @@ sign-in instead of the password. The grant is single use, bound to the user and 
 account); an emailed confirmation link (slower, and the user already proves identity to Google).
 A `has_password` flag was not added: existing Google users cannot be told apart reliably, so the
 dialog offers Google whenever an identity is linked and the password field always.
+
+
+## D45 — AI drafting for new emails and forwards; the sending mailbox always shown
+
+**Context.** "Write with AI" was offered for replies only, and the composer showed the sending
+mailbox only when there was a choice (on wider screens as a muted select in the header), so with
+several mailboxes it was easy to miss which one a new email would leave from.
+
+**Decision.**
+- `POST /assistant/compose` reuses D43's key, providers, prompt, safety rules and hourly limit.
+  The prompt gains `<task kind="reply|new|forward"/>`. A new email takes the note's language;
+  context is the chosen mailbox (ownership-checked), its sent mail to the first recipient as style
+  samples, and for a forward only the forwarded message. The output schema gains `subject`; the
+  composer applies it only when the subject is empty.
+- The composer always shows a "From" row (mark, name and full address) at every size and for
+  every mode, a native select when there is more than one mailbox. New emails need a chosen
+  mailbox before AI drafting.
+
+**Rejected.** A separate prompt per kind (three copies to keep in step); sending the composer's
+current body as context (the note is the instruction; the old body stays reachable by undo).

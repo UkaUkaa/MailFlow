@@ -21,6 +21,7 @@ Range.prototype.getBoundingClientRect = () => new DOMRect();
 
 const fetchMock = vi.fn<typeof fetch>();
 let configured: boolean;
+let accounts: ReturnType<typeof makeAccount>[];
 
 const settings = () => ({
   locale: "en",
@@ -55,13 +56,16 @@ const calls = (path: string) => fetchMock.mock.calls.filter(([url]) => String(ur
 
 beforeEach(() => {
   configured = true;
+  accounts = [makeAccount("acc-1")];
   fetchMock.mockReset();
   fetchMock.mockImplementation(async (input) => {
     const url = String(input);
-    if (url === "/api/v1/accounts") return json({ items: [makeAccount("acc-1")], next_cursor: null });
+    if (url === "/api/v1/accounts") return json({ items: accounts, next_cursor: null });
     if (url === "/api/v1/assistant") return json(assistant());
     if (url === "/api/v1/settings") return json(settings());
     if (url === "/api/v1/assistant/reply") return json({ language: "uk", body_html: "<p>Привіт, Марто!</p><p>Так, четвер підходить.</p>" });
+    if (url === "/api/v1/assistant/compose")
+      return json({ language: "en", subject: "March report", body_html: "<p>Hi Marta,</p><p>Could you send the March report by Friday?</p>" });
     if (url === "/api/v1/templates") return json({ items: [template] });
     if (url === "/api/v1/emails/drafts") return json({ id: "draft-1", updated_at: "2026-11-18T09:00:00Z" }, 201);
     return json({ items: [], next_cursor: null });
@@ -94,7 +98,8 @@ async function open(session: ComposeSession = base) {
       <ComposerPanel session={session} onClose={vi.fn()} onSent={vi.fn()} />
     </TooltipProvider>,
   );
-  const composer = within(await screen.findByRole("dialog", { name: session.mode === "new" ? "New message" : "Reply" }));
+  const titles = { new: "New message", reply: "Reply", reply_all: "Reply all", forward: "Forward" };
+  const composer = within(await screen.findByRole("dialog", { name: titles[session.mode] }));
   await composer.findByRole("textbox", { name: "Message" });
   return composer;
 }
@@ -129,9 +134,69 @@ describe("Write with AI", () => {
     expect(calls("/api/v1/assistant/reply")).toHaveLength(0);
   });
 
-  it("is not offered for a new message", async () => {
+  it("writes a new email as the chosen mailbox and suggests the subject", async () => {
     const composer = await open({ ...base, mode: "new", sourceMessageId: null });
-    expect(composer.queryByRole("button", { name: "Write with AI" })).not.toBeInTheDocument();
+    fireEvent.click((await composer.findAllByRole("button", { name: "Write with AI" }))[0]!);
+    const note = await composer.findByRole("textbox", { name: "Write with AI" });
+    expect(note).toHaveAttribute("placeholder", expect.stringContaining("What should the email say?"));
+    fireEvent.change(note, { target: { value: "ask for the March report" } });
+    fireEvent.keyDown(note, { key: "Enter" });
+
+    await waitFor(() => expect(composer.getByRole("textbox", { name: "Message" })).toHaveTextContent("Could you send the March report by Friday?"));
+    expect(composer.getByLabelText("Subject")).toHaveValue("March report");
+    const [, init] = calls("/api/v1/assistant/compose")[0]!;
+    expect(JSON.parse(String(init?.body))).toEqual({
+      account_id: "acc-1",
+      instruction: "ask for the March report",
+      subject: "",
+      recipient_email: "marta@example.com",
+      recipient_name: "Marta Shevchenko",
+      forwarded_message_id: null,
+    });
+  });
+
+  it("keeps the subject the user typed and sends the forwarded message for a forward", async () => {
+    const composer = await open({ ...base, mode: "forward", subject: "Fwd: Plans" });
+    fireEvent.click((await composer.findAllByRole("button", { name: "Write with AI" }))[0]!);
+    const write = await composer.findByRole("button", { name: "Write" });
+    await waitFor(() => expect(write).toBeEnabled());
+    fireEvent.click(write);
+
+    await waitFor(() => expect(calls("/api/v1/assistant/compose")).toHaveLength(1));
+    const [, init] = calls("/api/v1/assistant/compose")[0]!;
+    expect(JSON.parse(String(init?.body))).toMatchObject({ subject: "Fwd: Plans", forwarded_message_id: "msg-1" });
+    await waitFor(() => expect(composer.getByRole("textbox", { name: "Message" })).toHaveTextContent("Hi Marta,"));
+    expect(composer.getByLabelText("Subject")).toHaveValue("Fwd: Plans");
+  });
+
+  it("asks for the sending mailbox before writing a new email", async () => {
+    accounts = [makeAccount("acc-1"), makeAccount("acc-2")];
+    const composer = await open({ ...base, mode: "new", accountId: null, sourceMessageId: null });
+    fireEvent.click((await composer.findAllByRole("button", { name: "Write with AI" }))[0]!);
+    expect(await composer.findByText("Choose the mailbox to send from first")).toBeInTheDocument();
+    expect(composer.getByRole("button", { name: "Write" })).toBeDisabled();
+  });
+});
+
+describe("Sending mailbox", () => {
+  it("names the only mailbox even when there is nothing to choose", async () => {
+    accounts = [makeAccount("acc-1", {}, { display_name: "Work" })];
+    const composer = await open({ ...base, mode: "new", sourceMessageId: null });
+    expect(await composer.findByText("<acc-1@example.com>")).toBeInTheDocument();
+    expect(composer.getByText("Work")).toBeInTheDocument();
+    expect(composer.queryByRole("combobox", { name: "From" })).not.toBeInTheDocument();
+  });
+
+  it("lets the user switch between mailboxes", async () => {
+    accounts = [makeAccount("acc-1"), makeAccount("acc-2")];
+    const composer = await open({ ...base, mode: "new", sourceMessageId: null });
+    const from = await composer.findByRole("combobox", { name: "From" });
+    expect(from).toHaveValue("acc-1");
+    fireEvent.change(from, { target: { value: "acc-2" } });
+    // The chip next to the picker names the new mailbox, not only the option in the list.
+    await waitFor(() =>
+      expect(composer.getAllByText("acc-2@example.com").some((element) => element.tagName !== "OPTION")).toBe(true),
+    );
   });
 });
 

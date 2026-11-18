@@ -914,14 +914,20 @@
     },
     "composer": {
       "title": "Write with AI",
-      "placeholder": "What should the reply say? For example: agree, but move it to Thursday",
+      "placeholder": {
+        "reply": "What should the reply say? For example: agree, but move it to Thursday",
+        "new": "What should the email say? For example: ask Olena for the March report by Friday",
+        "forward": "What should go above the forwarded email? For example: FYI, see the dates below"
+      },
       "hint": "Enter to write, Shift+Enter for a new line",
       "write": "Write",
       "rewrite": "Rewrite",
       "writing": "Writing the reply…",
       "writtenIn": "Written in {language}. Undo brings your text back.",
-      "setupExplanation": "Connect your own ChatGPT, Claude or Gemini API key to write replies with AI. Nothing is sent until you do.",
-      "setup": "Connect AI"
+      "setupExplanation": "Connect your own ChatGPT, Claude or Gemini API key to write emails with AI. Nothing is sent until you do.",
+      "setup": "Connect AI",
+      "writingEmail": "Writing the email…",
+      "chooseAccount": "Choose the mailbox to send from first"
     },
     "errors": {
       "notConfigured": "Connect your AI key in Settings → AI replies first.",

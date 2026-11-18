@@ -272,6 +272,7 @@ as written; the composer fills them in on insert.
 | PATCH | `/assistant` | `{model}` | `Assistant` |
 | DELETE | `/assistant` | — | `204` |
 | POST | `/assistant/reply` | `{source_message_id, instruction?}` | `{language, body_html}` |
+| POST | `/assistant/compose` | `{account_id, instruction?, subject?, recipient_email?, recipient_name?, forwarded_message_id?}` | `{language, subject, body_html}` |
 
 `Assistant`: `{configured, provider, model, key_hint, models}` — the user's own AI connection
 (D43). The key is never returned; `key_hint` is its last four characters. `PUT` checks the key
@@ -287,3 +288,10 @@ Errors: `409 assistant_not_configured`, `404` (not the caller's message), `429 r
 (per user, `ASSISTANT_REQUESTS_PER_HOUR`), and from the provider `422 assistant_key_invalid`,
 `422 assistant_model_unavailable` / `assistant_model_unsupported`, `422 assistant_refused`,
 `429 assistant_rate_limited` (the user's own limit or credit), `503 assistant_unavailable`.
+
+`/assistant/compose` drafts a new email (or, with `forwarded_message_id`, the note above a
+forward) sent from `account_id`, from the same short `instruction`, in the note's language. The
+user's sent mail from that mailbox (to `recipient_email` first) is the style sample; the forwarded
+message is the only mail context. `subject` is suggested only for a new email whose `subject` was
+empty, otherwise `""`. Same errors as `/assistant/reply`; `404` when the mailbox or the forwarded
+message is not the caller's. Shares the per-user hourly limit.

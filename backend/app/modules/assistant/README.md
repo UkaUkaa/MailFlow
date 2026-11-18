@@ -7,10 +7,10 @@ sent without the user.
 
 | Layer | Contents |
 |---|---|
-| domain | `AiProvider`, `AssistantConfig`, `ReplyRequest`/`ReplyDraft`, key shape, default model, quote stripping, budget trimming, text -> safe HTML |
+| domain | `AiProvider`, `AssistantConfig`, `ReplyRequest`/`ReplyDraft` (with `DraftKind`), key shape, default model, quote stripping, budget trimming, text -> safe HTML |
 | application | `AssistantService` (connect / choose model / disconnect, drafting), ports `AiGateway`, `ReplyWriter`, `AssistantConfigRepository` |
 | infrastructure | `prompt.py` (shared system prompt, data tags, JSON output), `openai_writer.py` and `gemini_writer.py` (REST over HTTPX), `claude_writer.py` (Anthropic SDK), `gateway.py`, `repository.py` (`assistant_configs`) |
-| presentation | `/assistant` (GET, PUT, PATCH, DELETE), `/assistant/reply` |
+| presentation | `/assistant` (GET, PUT, PATCH, DELETE), `/assistant/reply`, `/assistant/compose` (new email or forward note, D45) |
 
 The key is checked with the provider (its model list) before it is stored, then kept only in the
 Token Vault (`user_secrets`, AES-256-GCM, bound to the user). `assistant_configs` keeps the
