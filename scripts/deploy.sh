@@ -36,7 +36,7 @@ git reset --quiet --hard "$SHA"
 echo "    now at $(git log --oneline -1)"
 
 echo "==> Building and starting the stack"
-"${COMPOSE[@]}" up -d --build --remove-orphans
+"${COMPOSE[@]}" up -d --build
 
 echo "==> Waiting for services to become healthy (up to ${HEALTH_TIMEOUT_SECONDS}s)"
 deadline=$((SECONDS + HEALTH_TIMEOUT_SECONDS))
