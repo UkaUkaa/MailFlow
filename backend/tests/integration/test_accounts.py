@@ -189,9 +189,7 @@ async def test_update_and_disconnect_account(alice, registry, owner_engine):
     )
     assert updated.json()["display_name"] == "Work" and updated.json()["color"] == "#1f8a4c"
     for bad_color in ("neon", "green", "#fff", "#12345g", "rgb(1,2,3)"):
-        bad = await alice.client.patch(
-            f"/api/v1/accounts/{account_id}", json={"color": bad_color}
-        )
+        bad = await alice.client.patch(f"/api/v1/accounts/{account_id}", json={"color": bad_color})
         assert bad.status_code == 422, bad_color
     assert (await alice.client.delete(f"/api/v1/accounts/{account_id}")).status_code == 204
     assert registry.revoked == ["rt:one@example.org"]

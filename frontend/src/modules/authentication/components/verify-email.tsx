@@ -34,7 +34,11 @@ function ResendForm() {
       <Field label={t("fields.email")} htmlFor="verify-email" error={errors.email?.message ? tv(errors.email.message) : undefined}>
         <Input id="verify-email" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" {...register("email")} />
       </Field>
-      <Button type="submit" loading={resend.isPending} className="w-full">
+      <Button
+        type="submit"
+        loading={resend.isPending}
+        className="h-auto min-h-9 w-full py-1.5 whitespace-normal touch:h-auto touch:min-h-11"
+      >
         {t("verify.resend")}
       </Button>
     </form>

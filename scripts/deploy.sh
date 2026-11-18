@@ -11,10 +11,15 @@
 #   3. waits until backend, frontend and nginx report healthy,
 #   4. removes dangling images so the disk does not fill up.
 # Any failure exits non-zero, which marks the GitHub deploy job red.
+#
+# Compose files: plain `docker compose`, so the server decides through COMPOSE_FILE in its .env
+# (Compose reads it). Without it only docker-compose.yml is used, which suits a server whose own
+# reverse proxy terminates TLS. A server where the bundled Nginx owns 80/443 sets
+# COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml.
 set -euo pipefail
 
 SHA="${1:?usage: scripts/deploy.sh <commit-sha>}"
-COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.prod.yml)
+COMPOSE=(docker compose)
 HEALTH_TIMEOUT_SECONDS="${HEALTH_TIMEOUT_SECONDS:-300}"
 
 cd "$(dirname "$0")/.."

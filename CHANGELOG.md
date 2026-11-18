@@ -3,6 +3,16 @@
 ## [Unreleased]
 
 ### Added
+- CI (`.github/workflows/ci.yml`): backend ruff, mypy and pytest against the dev
+  PostgreSQL/Redis/GreenMail services; frontend lint, typecheck, Vitest, build and Playwright
+  e2e. Runs on every PR and push to `main`.
+- Auto-deploy: when CI is green on `main`, the `deploy` job runs `scripts/deploy.sh` on the
+  server over SSH (tested commit, `docker compose up --build`, health wait). Configured through
+  `DEPLOY_*` repository variables and secrets; skipped until they are set. See `docs/DOCKER.md`.
+
+### Fixed
+- The "send a new verification email" button wraps instead of overflowing a 320 px screen in
+  Ukrainian (caught by the e2e viewport matrix in CI).
 - AI pull-request review (`.github/workflows/ai-pr-review.yml`): on every non-draft PR an AI
   agent (Claude Sonnet 5.5 via `anthropics/claude-code-action`) scores the code 1-10, writes a short code
   review in Russian and lists recommendations only when they matter. One comment per PR,
