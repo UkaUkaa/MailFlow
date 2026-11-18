@@ -11,6 +11,17 @@ export interface EmailDocumentOptions {
   collapseQuotes?: boolean;
   /** Base text size in px (Settings → Interface); the email's own sizes still win. */
   fontSize?: number;
+  /** The app's resolved theme. A themed email uses exactly this scheme (see `emailColorScheme`). */
+  theme: "light" | "dark";
+}
+
+/**
+ * The single colour scheme of the frame. It must be one scheme, never "light dark": a frame whose
+ * scheme differs from the page's gets an opaque system backdrop (black on an iPhone in dark mode)
+ * under text coloured for the app theme. The iframe element is given the same scheme.
+ */
+export function emailColorScheme(html: string, theme: "light" | "dark"): "light" | "dark" {
+  return emailFollowsTheme(html) ? theme : "light";
 }
 
 const OWN_COLOURS = /\bbgcolor\s*=|\bbackground(?:-color)?\s*:|(?:^|[\s;"'])color\s*:|<font\b[^>]*\bcolor\s*=/i;
@@ -119,13 +130,14 @@ export function buildEmailDocument(html: string, options: EmailDocumentOptions):
   const link = themed ? options.linkColor : "#3355e0";
   const muted = themed ? options.mutedColor : "#5d5f6b";
   const border = themed ? options.borderColor : "#d2d2d9";
+  const scheme = emailColorScheme(html, options.theme);
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="${contentSecurityPolicy(options.allowRemoteImages)}">
 <meta name="referrer" content="no-referrer">
-<meta name="color-scheme" content="${themed ? "light dark" : "light"}">
+<meta name="color-scheme" content="${scheme}">
 <base target="_blank">
 <style>
-html{overflow:hidden;background:transparent}
+html{overflow:hidden;background:transparent;color-scheme:${scheme}}
 body{margin:0;padding:${themed ? 0 : (options.paperPadding ?? 0)}px;font:${options.fontSize ?? 15}px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:${foreground};background:${themed ? "transparent" : "#ffffff"};overflow-wrap:anywhere;word-break:break-word;-webkit-text-size-adjust:100%}
 img,video{max-width:100%;height:auto}
 a{color:${link}}

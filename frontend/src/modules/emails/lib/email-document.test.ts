@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { buildEmailDocument, contentSecurityPolicy, emailFollowsTheme, hasQuotedHistory, markQuotedHistory, stripRemoteImages } from "./email-document";
+import {
+  buildEmailDocument,
+  contentSecurityPolicy,
+  emailColorScheme,
+  emailFollowsTheme,
+  hasQuotedHistory,
+  markQuotedHistory,
+  stripRemoteImages,
+} from "./email-document";
 
-const options = { foreground: "#eee", linkColor: "#88f", mutedColor: "#aaa", borderColor: "#333" };
+const options = { foreground: "#eee", linkColor: "#88f", mutedColor: "#aaa", borderColor: "#333", theme: "dark" as const };
 
 describe("email document", () => {
   it("blocks remote images unless explicitly allowed", () => {
@@ -58,6 +66,29 @@ describe("email document", () => {
     expect(paper).toContain("padding:16px");
     expect(paper).toContain("color:#17181c;background:#ffffff");
   });
+
+  // Regression: a template (plain rich text, no colours) declared "light dark". On an iPhone in
+  // dark mode with MailFlow on the light theme the frame's scheme differed from the page's, so
+  // Safari painted an opaque black backdrop under the light theme's near-black text.
+  it("gives a themed email exactly the app's scheme, never both", () => {
+    const template = "<p>Hello {{first_name}},</p><p>Thanks for <b>your order</b>.</p>";
+    for (const theme of ["light", "dark"] as const) {
+      const doc = buildEmailDocument(template, { ...options, theme, allowRemoteImages: false });
+      expect(doc).toContain(`<meta name="color-scheme" content="${theme}">`);
+      expect(doc).toContain(`color-scheme:${theme}`);
+      expect(doc).not.toContain("light dark");
+      expect(emailColorScheme(template, theme)).toBe(theme);
+    }
+  });
+
+  it("keeps a styled email light in both themes", () => {
+    const styled = '<p style="color:#111">Hello</p>';
+    for (const theme of ["light", "dark"] as const) {
+      const doc = buildEmailDocument(styled, { ...options, theme, allowRemoteImages: false });
+      expect(doc).toContain('<meta name="color-scheme" content="light">');
+      expect(emailColorScheme(styled, theme)).toBe("light");
+    }
+  });
 });
 
 describe("markQuotedHistory", () => {
@@ -98,7 +129,7 @@ describe("markQuotedHistory", () => {
   });
 
   it("hides marked quotes only while collapsed, without touching the policy", () => {
-    const options = { allowRemoteImages: false, foreground: "#111", linkColor: "#00f", mutedColor: "#666", borderColor: "#ccc" };
+    const options = { allowRemoteImages: false, foreground: "#111", linkColor: "#00f", mutedColor: "#666", borderColor: "#ccc", theme: "light" as const };
     const html = "<p>Reply</p><blockquote>Old</blockquote>";
     const collapsed = buildEmailDocument(html, { ...options, collapseQuotes: true });
     const expanded = buildEmailDocument(html, { ...options, collapseQuotes: false });

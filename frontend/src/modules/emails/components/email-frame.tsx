@@ -8,7 +8,7 @@ import { useRootDataset } from "@/shared/hooks/use-root-dataset";
 import { READER_FONT_SIZE, READER_TEXT_SIZES, type ReaderTextSize } from "@/shared/lib/interface-preferences";
 import { Button } from "@/shared/components/ui/button";
 import { cn } from "@/shared/lib/cn";
-import { buildEmailDocument, emailFollowsTheme, hasQuotedHistory } from "../lib/email-document";
+import { buildEmailDocument, emailColorScheme, emailFollowsTheme, hasQuotedHistory } from "../lib/email-document";
 
 function themeColor(name: string, fallback: string): string {
   if (typeof window === "undefined") return fallback;
@@ -49,6 +49,7 @@ export function EmailFrame({
   const fontSize = READER_FONT_SIZE[READER_TEXT_SIZES.includes(textSize as ReaderTextSize) ? (textSize as ReaderTextSize) : "default"];
 
   const themed = emailFollowsTheme(html);
+  const theme = resolvedTheme === "dark" ? "dark" : "light";
   const srcDoc = useMemo(
     () =>
       buildEmailDocument(html, {
@@ -60,6 +61,7 @@ export function EmailFrame({
         paperPadding: resolvedTheme === "dark" ? 16 : 0,
         collapseQuotes: !quotesShown,
         fontSize,
+        theme,
       }),
     // `accent` is read through `themeColor("--accent")`; it is listed so the link colour follows it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -148,7 +150,7 @@ export function EmailFrame({
           referrerPolicy="no-referrer"
           onLoad={handleLoad}
           className="block border-0"
-          style={{ height, width: showOriginal ? naturalWidth : "100%" }}
+          style={{ height, width: showOriginal ? naturalWidth : "100%", colorScheme: emailColorScheme(html, theme) }}
         />
       </div>
       {hasQuote ? (
