@@ -6,6 +6,14 @@
 - **Write with AI for new emails and forwards** (D45). The composer's AI button now works in every
   mode: a short note becomes the full email, written as the chosen mailbox, in the note's
   language; an empty subject is filled with a suggested one. `POST /assistant/compose`.
+- **Movable docked reply.** On desktop the small reply/forward window can be dragged anywhere by
+  its header or grip (arrow keys on the grip move it, Home puts it back); it never leaves the
+  window, also after the window is resized.
+- **Drag-and-drop attachments.** Files dropped on the composer (any layout: new message, reply,
+  forward, docked or full page) are attached with the usual 20-file / 25 MB limits; a hint shows
+  while files are dragged over it. Dragged text still goes to the editor.
+- The docked reply lists its attachments in a compact strip above the footer, always visible,
+  each with a remove button.
 
 ### Changed
 - New README in English and Ukrainian (`README.uk.md`) with screenshots, architecture and
@@ -21,6 +29,12 @@
   sync appears without reloading. Search results are not polled; hidden tabs do not poll.
 
 ### Fixed
+- **Wide emails left unscaled while a remote image loads.** The reader fitted the email (scaling
+  wide tables, sizing the frame) only on the frame's `load` event, which waits for every image.
+  One remote image on a host that never answered (e.g. a tracking pixel) kept a 900px table
+  overflowing and the frame at its 120px placeholder height. The frame is now fitted as soon as
+  the email is parsed and again as images arrive. The e2e mocks answer the fixtures' remote
+  images, so the suite no longer depends on the machine's DNS.
 - **Unreadable emails on iPhone when the theme differs from the phone's.** Emails without colours
   of their own (e.g. sent from a template) declared `color-scheme: light dark` in the reader frame.
   With MailFlow on the light theme and the iPhone in dark mode, the frame's scheme no longer matched

@@ -457,6 +457,9 @@ export async function mockApi(page: Page, options: MockOptions = {}): Promise<Mo
   };
 
   await page.route("**/api/v1/**", handler);
+  // Remote images in the fixture emails (tracker.example) must not depend on the machine's DNS:
+  // answer them with an empty image. Tests that count or stall them register their own route.
+  await page.route("**://tracker.example/**", (route) => route.fulfill({ status: 200, contentType: "image/gif", body: "" }));
   return {
     calls,
     callsTo: (method, path) =>

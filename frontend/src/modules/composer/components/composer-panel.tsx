@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, FileText, Maximize2, Minimize2, Paperclip, Send, Sparkles, Trash2, X } from "lucide-react";
+import { ChevronDown, FileText, GripVertical, Maximize2, Minimize2, Paperclip, Send, Sparkles, Trash2, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useId, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { toast } from "sonner";
@@ -25,6 +25,8 @@ import { cn } from "@/shared/lib/cn";
 import type { Address } from "@/shared/types/address";
 import { createDraft, deleteDraft, sendEmail, updateDraft } from "../api";
 import { isValidEmail } from "../lib/recipients";
+import { useDraggablePanel } from "../lib/use-draggable-panel";
+import { useFileDrop } from "../lib/use-file-drop";
 import { useVisualViewportVars } from "../lib/use-visual-viewport";
 import { toServerLocalTime } from "@/shared/lib/user-time";
 import { sendErrorKey } from "../lib/send-errors";
@@ -44,8 +46,11 @@ const square = "md:size-7 md:rounded-sm md:border md:border-border-strong";
  * - phone: a full-screen sheet sized to the visual viewport;
  * - tablet and wider: a document-like page that takes over the list and reading panes (the
  *   navigation rail stays);
- * - replies and forwards on desktop (≥ 1024px): a panel docked at the bottom right of the
- *   reading pane, which can be expanded to the page and docked again.
+ * - replies and forwards on desktop (≥ 1024px): a small window docked at the bottom right of
+ *   the reading pane, which the user can move anywhere in the window, expand to the page and
+ *   dock again.
+ * Files dropped anywhere on the composer are attached; the docked window lists them in a strip
+ * above its footer, so they stay visible however long the message is.
  */
 export function ComposerPanel({
   session,
@@ -67,6 +72,7 @@ export function ComposerPanel({
   useVisualViewportVars(panelRef);
   const fileInputId = useId();
   const subjectId = useId();
+  const moveHintId = useId();
 
   // Docked vs. page is an interaction difference, so it is decided in script (the panel is
   // client-only); phone vs. page is plain CSS.
@@ -74,6 +80,7 @@ export function ComposerPanel({
   const [expanded, setExpanded] = useState(false);
   const dockable = session.mode !== "new" && desktop;
   const docked = dockable && !expanded;
+  const drag = useDraggablePanel(panelRef, docked);
 
   const [accountId, setAccountId] = useState(session.accountId);
   const [to, setTo] = useState<Address[]>(session.to);
@@ -269,9 +276,8 @@ export function ComposerPanel({
 
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0) + forwarded.reduce((sum, item) => sum + item.size, 0);
 
-  const addFiles = (event: ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(event.target.files ?? []);
-    event.target.value = "";
+  /** Adds picked or dropped files, unless they would break the per-message limits. */
+  const attachFiles = (picked: File[]) => {
     if (picked.length === 0) return;
     if (files.length + forwarded.length + picked.length > MAX_ATTACHMENT_FILES) {
       toast.error(t("tooManyFiles", { max: MAX_ATTACHMENT_FILES }));
@@ -284,6 +290,14 @@ export function ComposerPanel({
     setFiles((current) => [...current, ...picked]);
     touch();
   };
+
+  const onFileInput = (event: ChangeEvent<HTMLInputElement>) => {
+    const picked = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    attachFiles(picked);
+  };
+
+  const fileDrop = useFileDrop(attachFiles);
 
   const send = async (allowEmptySubject = false, sendAt: Date | null = null) => {
     if (sending) return;
@@ -484,6 +498,42 @@ export function ComposerPanel({
     </>
   );
 
+  const attachmentCount = files.length + forwarded.length;
+  const attachmentItems = (compact: boolean) => (
+    <>
+      {forwarded.map((attachment) => (
+        <li key={attachment.id} className={cn(compact && "shrink-0")}>
+          <AttachmentChip
+            compact={compact}
+            filename={attachment.filename}
+            mimeType={attachment.mime_type}
+            size={attachment.size}
+            removeLabel={t("removeAttachment")}
+            onRemove={() => {
+              setForwarded((current) => current.filter((item) => item.id !== attachment.id));
+              touch();
+            }}
+          />
+        </li>
+      ))}
+      {files.map((file, index) => (
+        <li key={`${file.name}-${file.size}-${index}`} className={cn(compact && "shrink-0")}>
+          <AttachmentChip
+            compact={compact}
+            filename={file.name}
+            mimeType={file.type || "application/octet-stream"}
+            size={file.size}
+            removeLabel={t("removeAttachment")}
+            onRemove={() => {
+              setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
+              touch();
+            }}
+          />
+        </li>
+      ))}
+    </>
+  );
+
   const recipient = { removeLabel: (email: string) => t("removeRecipient", { email }), invalidLabel: t("invalidAddress") };
 
   return (
@@ -493,10 +543,14 @@ export function ComposerPanel({
         role="dialog"
         aria-label={title}
         data-layout={docked ? "docked" : "page"}
+        data-dragging={drag.dragging || undefined}
         onKeyDown={onKeyDown}
         onKeyDownCapture={onKeyDownCapture}
+        {...fileDrop.dropProps}
+        style={docked && (drag.offset.x !== 0 || drag.offset.y !== 0) ? { translate: `${drag.offset.x}px ${drag.offset.y}px` } : undefined}
         className={cn(
           "fixed z-40 flex min-w-0 flex-col",
+          drag.dragging && "select-none",
           docked
             ? "right-3 bottom-3 h-[380px] max-h-[calc(100dvh-5rem)] w-[520px] overflow-hidden rounded-lg border border-border bg-surface-raised shadow-lg animate-pop-in"
             : // Sized to the visual viewport so nothing hides behind an on-screen keyboard; from
@@ -505,7 +559,27 @@ export function ComposerPanel({
         )}
       >
         {docked ? (
-          <header className="flex h-12 shrink-0 items-center gap-2 pr-3 pl-4">
+          <header
+            {...drag.dragAreaProps}
+            className={cn("flex h-12 shrink-0 touch-none items-center gap-2 pr-3 pl-1.5", drag.dragging ? "cursor-grabbing" : "cursor-grab")}
+          >
+            <Tooltip label={t("move")} disabled={drag.dragging}>
+              <button
+                type="button"
+                aria-label={t("move")}
+                aria-describedby={moveHintId}
+                {...drag.handleProps}
+                className={cn(
+                  "inline-flex size-7 shrink-0 items-center justify-center rounded-sm text-foreground-subtle hover:bg-muted hover:text-foreground touch:size-11",
+                  drag.dragging ? "cursor-grabbing" : "cursor-grab",
+                )}
+              >
+                <GripVertical className="size-4" aria-hidden />
+              </button>
+            </Tooltip>
+            <span id={moveHintId} className="sr-only">
+              {t("moveHint")}
+            </span>
             <div className="min-w-0 flex-1">{subjectInput("h-8 text-sm text-ellipsis")}</div>
             <span aria-live="polite" className="shrink-0 text-xs text-foreground-subtle">
               {saveLabel}
@@ -636,40 +710,18 @@ export function ComposerPanel({
               </div>
             ) : null}
 
-            {files.length + forwarded.length > 0 ? (
-              <AttachmentList label={t("attachments")}>
-                {forwarded.map((attachment) => (
-                  <li key={attachment.id}>
-                    <AttachmentChip
-                      filename={attachment.filename}
-                      mimeType={attachment.mime_type}
-                      size={attachment.size}
-                      removeLabel={t("removeAttachment")}
-                      onRemove={() => {
-                        setForwarded((current) => current.filter((item) => item.id !== attachment.id));
-                        touch();
-                      }}
-                    />
-                  </li>
-                ))}
-                {files.map((file, index) => (
-                  <li key={`${file.name}-${file.size}-${index}`}>
-                    <AttachmentChip
-                      filename={file.name}
-                      mimeType={file.type || "application/octet-stream"}
-                      size={file.size}
-                      removeLabel={t("removeAttachment")}
-                      onRemove={() => {
-                        setFiles((current) => current.filter((_, itemIndex) => itemIndex !== index));
-                        touch();
-                      }}
-                    />
-                  </li>
-                ))}
-              </AttachmentList>
-            ) : null}
+            {!docked && attachmentCount > 0 ? <AttachmentList label={t("attachments")}>{attachmentItems(false)}</AttachmentList> : null}
           </div>
         </div>
+
+        {docked && attachmentCount > 0 ? (
+          <ul
+            aria-label={t("attachments")}
+            className="scrollbar-thin flex shrink-0 gap-1.5 overflow-x-auto overscroll-contain border-t border-border px-3 py-1.5"
+          >
+            {attachmentItems(true)}
+          </ul>
+        ) : null}
 
         {error ? (
           <p role="alert" className="border-t border-border bg-danger-soft px-4 py-2 text-[13px] break-words text-danger">
@@ -688,13 +740,25 @@ export function ComposerPanel({
           )}
         >
           <EditorToolbar editor={editor} className="flex-1" />
-          <input id={fileInputId} type="file" multiple hidden onChange={addFiles} />
+          <input id={fileInputId} type="file" multiple hidden onChange={onFileInput} />
           {aiButton(docked ? undefined : "md:hidden")}
           {templateButton(docked ? undefined : "md:hidden")}
           {attachButton(docked ? undefined : "md:hidden")}
           {discardButton(docked ? undefined : "md:hidden")}
           {docked ? sendButton : null}
         </footer>
+
+        {fileDrop.active ? (
+          <div
+            data-testid="composer-drop-overlay"
+            className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[inherit] border-2 border-dashed border-accent bg-accent-soft/90 p-4 text-center text-sm font-medium text-accent"
+          >
+            <span className="flex items-center gap-2">
+              <Paperclip className="size-4 shrink-0" aria-hidden />
+              {t("dropFiles")}
+            </span>
+          </div>
+        ) : null}
       </div>
 
       <ResponsiveDialog

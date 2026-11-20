@@ -131,6 +131,31 @@ test.describe("composer", () => {
     expect(api.callsTo("POST", "/emails/send")[0]?.body).toContain('name="files"; filename="notes.txt"');
   });
 
+  test("attaches files dropped on a new message", async ({ page }) => {
+    const api = await mockApi(page);
+    await page.goto("/en/mail/inbox");
+    await page.getByRole("button", { name: "Compose" }).click();
+    const composer = page.getByRole("dialog", { name: "New message" });
+    const dataTransfer = await page.evaluateHandle(() => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(["hello"], "dropped.txt", { type: "text/plain" }));
+      return transfer;
+    });
+    const body = composer.getByRole("textbox", { name: "Message" });
+    await body.dispatchEvent("dragenter", { dataTransfer });
+    await expect(composer.getByText("Drop files to attach them")).toBeVisible();
+    await body.dispatchEvent("dragover", { dataTransfer });
+    await body.dispatchEvent("drop", { dataTransfer });
+    await expect(composer.getByRole("list", { name: "Attachments" }).getByText("dropped.txt")).toBeVisible();
+    await expect(body).not.toContainText("dropped.txt");
+
+    await composer.getByLabel("To").fill("daniel@okafor.example,");
+    await composer.getByLabel("Subject").fill("Dropped");
+    await composer.getByRole("button", { name: "Send" }).last().click();
+    await expect.poll(() => api.callsTo("POST", "/emails/send").length).toBe(1);
+    expect(api.callsTo("POST", "/emails/send")[0]?.body).toContain('name="files"; filename="dropped.txt"');
+  });
+
   test("keeps the message as a draft when closed and deletes it when discarded", async ({ page }) => {
     const api = await mockApi(page);
     await page.goto("/en/mail/inbox");

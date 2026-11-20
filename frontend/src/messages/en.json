@@ -386,6 +386,9 @@
       }
     },
     "dock": "Dock",
+    "move": "Move window",
+    "moveHint": "Drag to move the window anywhere. With the keyboard: arrow keys move it, Home puts it back.",
+    "dropFiles": "Drop files to attach them",
     "recipientsPlaceholder": "To, Cc, Bcc",
     "sendLater": "Send later",
     "scheduleLabel": "Schedule for later",

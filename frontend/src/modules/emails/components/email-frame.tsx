@@ -106,17 +106,53 @@ export function EmailFrame({
     setHeight(Math.ceil(doc.documentElement.scrollHeight));
   }, [originalSize]);
 
-  const handleLoad = useCallback(() => {
-    const doc = frameRef.current?.contentDocument;
-    if (!doc) return;
-    for (const anchor of Array.from(doc.querySelectorAll("a[href]"))) {
-      anchor.setAttribute("target", "_blank");
-      anchor.setAttribute("rel", "noopener noreferrer nofollow");
-    }
-    // Images finishing late change the height.
-    doc.addEventListener("load", measure, true);
-    measure();
+  // The document listeners outlive a change of `measure`; they always call the current one.
+  const measureRef = useRef(measure);
+  useEffect(() => {
+    measureRef.current = measure;
   }, [measure]);
+  const prepared = useRef(new WeakSet<Document>());
+
+  /**
+   * Sets up a newly parsed email document and fits it. Returns false while the email's own
+   * document is not parsed yet. Runs once the markup is there, not on the frame's `load`: that
+   * waits for every image, and one slow remote image (a tracker on a dead host) would leave a
+   * wide email unscaled and the frame at its placeholder height for as long as it hangs.
+   */
+  const prepare = useCallback((): boolean => {
+    const doc = frameRef.current?.contentDocument;
+    if (!doc || doc.URL !== "about:srcdoc" || doc.readyState === "loading" || !doc.body) return false;
+    if (!prepared.current.has(doc)) {
+      prepared.current.add(doc);
+      for (const anchor of Array.from(doc.querySelectorAll("a[href]"))) {
+        anchor.setAttribute("target", "_blank");
+        anchor.setAttribute("rel", "noopener noreferrer nofollow");
+      }
+      // Images finishing late change the height.
+      doc.addEventListener("load", () => measureRef.current(), true);
+    }
+    measureRef.current();
+    return true;
+  }, []);
+
+  const handleLoad = useCallback(() => {
+    prepare();
+  }, [prepare]);
+
+  // A new srcDoc replaces the document; pick up the new one as soon as it is parsed. Until
+  // then `contentDocument` is still the previous (already prepared) one, so wait for a new one.
+  useEffect(() => {
+    let frameId = 0;
+    const deadline = performance.now() + 10_000;
+    const tick = () => {
+      const doc = frameRef.current?.contentDocument;
+      const fresh = doc && !prepared.current.has(doc);
+      if (fresh && prepare()) return;
+      if (performance.now() < deadline) frameId = requestAnimationFrame(tick);
+    };
+    tick();
+    return () => cancelAnimationFrame(frameId);
+  }, [srcDoc, prepare]);
 
   useEffect(() => {
     const wrapper = wrapperRef.current;

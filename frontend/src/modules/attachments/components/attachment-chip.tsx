@@ -18,9 +18,37 @@ interface ChipProps {
   downloadLabel?: string;
   onRemove?: () => void;
   removeLabel?: string;
+  /** One-line pill for tight spaces such as the docked reply panel. */
+  compact?: boolean;
 }
 
-export function AttachmentChip({ filename, mimeType, size, downloadId, downloadLabel, onRemove, removeLabel }: ChipProps) {
+export function AttachmentChip({ filename, mimeType, size, downloadId, downloadLabel, onRemove, removeLabel, compact }: ChipProps) {
+  if (compact) {
+    return (
+      <div
+        title={filename}
+        className="flex h-8 max-w-52 min-w-0 items-center gap-1.5 rounded-full border border-border bg-surface-raised pr-0.5 pl-2.5 text-xs touch:h-11"
+      >
+        <span className="shrink-0 text-foreground-muted [&>svg]:size-3.5">
+          <FileIcon mimeType={mimeType} />
+        </span>
+        <span className="min-w-0 truncate font-medium text-foreground">{filename}</span>
+        <span className="shrink-0 text-foreground-subtle">{formatBytes(size)}</span>
+        {onRemove ? (
+          <button
+            type="button"
+            onClick={onRemove}
+            aria-label={removeLabel ? `${removeLabel}: ${filename}` : filename}
+            className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-foreground-subtle hover:bg-muted hover:text-foreground touch:size-10"
+          >
+            <X className="size-3.5" aria-hidden />
+          </button>
+        ) : (
+          <span className="w-2" aria-hidden />
+        )}
+      </div>
+    );
+  }
   const body = (
     <>
       <span className="inline-flex size-8 shrink-0 items-center justify-center rounded-sm bg-muted text-foreground-muted">
