@@ -21,6 +21,12 @@
   sync appears without reloading. Search results are not polled; hidden tabs do not poll.
 
 ### Fixed
+- **Wide emails left unscaled while a remote image loads.** The reader fitted the email (scaling
+  wide tables, sizing the frame) only on the frame's `load` event, which waits for every image.
+  One remote image on a host that never answered (e.g. a tracking pixel) kept a 900px table
+  overflowing and the frame at its 120px placeholder height. The frame is now fitted as soon as
+  the email is parsed and again as images arrive. The e2e mocks answer the fixtures' remote
+  images, so the suite no longer depends on the machine's DNS.
 - **Unreadable emails on iPhone when the theme differs from the phone's.** Emails without colours
   of their own (e.g. sent from a template) declared `color-scheme: light dark` in the reader frame.
   With MailFlow on the light theme and the iPhone in dark mode, the frame's scheme no longer matched

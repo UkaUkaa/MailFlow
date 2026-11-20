@@ -145,6 +145,32 @@ test.describe("reading", () => {
     await expect.poll(() => remote.length).toBeGreaterThan(0);
   });
 
+  // Regression: the frame was fitted only on its `load` event, which waits for every image. A
+  // remote image on a host that never answers left the 900px table unscaled and the frame at its
+  // 120px placeholder height.
+  test("fits a wide email while a remote image is still loading", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockApi(page);
+    const stalled: string[] = [];
+    await page.route("**://tracker.example/**", (route) => {
+      stalled.push(route.request().url()); // never answered
+    });
+    await page.goto("/en/mail/inbox/thread-2");
+    const frame = page.locator("iframe").last();
+    await expect(frame).toBeVisible();
+    await expect.poll(() => stalled.length).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        frame.evaluate((element: HTMLIFrameElement) => {
+          const root = element.contentDocument?.documentElement;
+          return root ? root.scrollWidth - root.clientWidth : Number.POSITIVE_INFINITY;
+        }),
+      )
+      .toBeLessThanOrEqual(1);
+    expect((await frame.boundingBox())?.height ?? 0).toBeGreaterThan(120);
+    expect(await frame.evaluate((element: HTMLIFrameElement) => element.contentDocument?.readyState)).not.toBe("complete");
+  });
+
   test("blocks remote images for a user who turned them off until asked", async ({ page }) => {
     await mockApi(page, { settings: { load_remote_images: false } });
     // Counts requests that actually reach the network (CSP-blocked ones never do).
