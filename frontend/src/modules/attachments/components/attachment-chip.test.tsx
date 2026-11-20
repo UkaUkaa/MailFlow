@@ -19,4 +19,15 @@ describe("AttachmentChip", () => {
     expect(onRemove).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
+
+  it("renders a compact pill that still shows the name, size and a remove button", async () => {
+    const onRemove = vi.fn();
+    render(
+      <AttachmentChip compact filename="quarterly-report.pdf" mimeType="application/pdf" size={2048} onRemove={onRemove} removeLabel="Remove attachment" />,
+    );
+    expect(screen.getByTitle("quarterly-report.pdf")).toBeInTheDocument();
+    expect(screen.getByText("2.0 KB")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove attachment: quarterly-report.pdf" }));
+    expect(onRemove).toHaveBeenCalledTimes(1);
+  });
 });

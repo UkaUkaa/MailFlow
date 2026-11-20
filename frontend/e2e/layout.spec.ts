@@ -558,6 +558,79 @@ test.describe("docked reply", () => {
     expect(sends[0]?.body).toContain("Looks good.");
   });
 
+  test("moves anywhere in the window and stays inside it", async ({ page }) => {
+    await mockApi(page);
+    await page.goto("/en/mail/inbox/thread-2");
+    await page.getByRole("article").getByRole("button", { name: "Reply", exact: true }).click();
+    const panel = page.getByRole("dialog", { name: "Reply", exact: true });
+    await expect.poll(async () => (await panel.boundingBox())?.x).toBe(1440 - 12 - 520);
+    const start = (await panel.boundingBox())!;
+
+    const grip = panel.getByRole("button", { name: "Move window" });
+    const gripBox = (await grip.boundingBox())!;
+    await page.mouse.move(gripBox.x + gripBox.width / 2, gripBox.y + gripBox.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(gripBox.x - 500, gripBox.y - 300, { steps: 8 });
+    await page.mouse.up();
+    const moved = (await panel.boundingBox())!;
+    expect(Math.round(moved.x)).toBe(Math.round(start.x - 500 - gripBox.width / 2));
+    expect(Math.round(moved.y)).toBe(Math.round(start.y - 300 - gripBox.height / 2));
+    // Typing still goes to the message after a move.
+    await panel.getByRole("textbox", { name: "Message" }).click();
+    await page.keyboard.type("Moved.");
+    await expect(panel.getByRole("textbox", { name: "Message" })).toContainText("Moved.");
+
+    // Dragging the header far past the corner stops 8px from the window edges.
+    const header = (await panel.locator("header").boundingBox())!;
+    await page.mouse.move(header.x + 4, header.y + header.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(1, 1, { steps: 8 });
+    await page.mouse.up();
+    expect(await panel.boundingBox()).toMatchObject({ x: 8, y: 8 });
+
+    // Home on the grip puts it back in its corner.
+    await grip.focus();
+    await page.keyboard.press("Home");
+    await expect.poll(async () => (await panel.boundingBox())?.x).toBe(start.x);
+  });
+
+  test("takes dropped files and lists them in the small window", async ({ page }) => {
+    const api = await mockApi(page);
+    await page.goto("/en/mail/inbox/thread-2");
+    await page.getByRole("article").getByRole("button", { name: "Reply", exact: true }).click();
+    const panel = page.getByRole("dialog", { name: "Reply", exact: true });
+    await expect(panel).toHaveAttribute("data-layout", "docked");
+
+    const dataTransfer = await page.evaluateHandle(() => {
+      const transfer = new DataTransfer();
+      transfer.items.add(new File(["hello"], "notes.txt", { type: "text/plain" }));
+      transfer.items.add(new File(["%PDF-1.4"], "contract.pdf", { type: "application/pdf" }));
+      return transfer;
+    });
+    const body = panel.getByRole("textbox", { name: "Message" });
+    await body.dispatchEvent("dragenter", { dataTransfer });
+    await expect(page.getByTestId("composer-drop-overlay")).toBeVisible();
+    await body.dispatchEvent("dragover", { dataTransfer });
+    await body.dispatchEvent("drop", { dataTransfer });
+    await expect(page.getByTestId("composer-drop-overlay")).toHaveCount(0);
+
+    const list = panel.getByRole("list", { name: "Attachments" });
+    await expect(list.getByRole("listitem")).toHaveCount(2);
+    await expect(list).toBeInViewport();
+    await list.getByRole("button", { name: "Remove attachment: notes.txt" }).click();
+    await expect(list.getByRole("listitem")).toHaveCount(1);
+    // The strip never widens the window.
+    expect((await panel.boundingBox())?.width).toBe(520);
+
+    await body.click();
+    await page.keyboard.type("Signed copy attached.");
+    await panel.getByRole("button", { name: "Send" }).click();
+    await expect.poll(() => api.callsTo("POST", "/emails/send").length).toBe(1);
+    const sent = api.callsTo("POST", "/emails/send")[0]?.body ?? "";
+    expect(sent).toContain('filename="contract.pdf"');
+    expect(sent).not.toContain('filename="notes.txt"');
+  });
+
   test("below 1024px a reply uses the full composer", async ({ page }) => {
     await page.setViewportSize({ width: 1000, height: 800 });
     await mockApi(page);
